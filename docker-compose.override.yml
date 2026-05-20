@@ -1,0 +1,9 @@
+services:
+  bot:
+    volumes:
+      - .:/app
+    command: ["python", "-u", "main.py"]
+
+  db:
+    ports:
+      - "5432:5432"
