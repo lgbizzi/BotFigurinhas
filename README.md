@@ -13,7 +13,7 @@ Cada usuário tem seu próprio álbum independente com as **994 figurinhas** ofi
 | `/adicionar` | Adiciona figurinha ao estoque (fluxo conversacional) |
 | `/adicionar_lote` | Adiciona várias figurinhas de uma vez (uma por linha) |
 | `/remover` | Remove figurinha do estoque (fluxo conversacional) |
-| `/progresso` | Exibe estatísticas detalhadas do álbum: percentual, países completos, top-3 próximos e distantes, brilhantes faltantes e CC faltantes |
+| `/progresso` | Exibe estatísticas detalhadas: percentual, países completos, top-3 próximos e distantes, brilhantes faltantes e CC faltantes |
 | `/faltantes` | Lista figurinhas faltantes agrupadas por grupo de álbum (uma mensagem por grupo) |
 | `/repetidas` | Lista figurinhas repetidas agrupadas por grupo de álbum (uma mensagem por grupo) |
 | `/cancelar` | Cancela a operação em andamento |
@@ -23,13 +23,13 @@ Cada usuário tem seu próprio álbum independente com as **994 figurinhas** ofi
 O bot aceita múltiplos formatos de entrada:
 
 ```
-BRA-1           → BRA-1
-Brasil 1        → BRA-1
-brasil-01       → BRA-1
-Alemanha 5      → GER-5
+BRA-1             → BRA-1
+Brasil 1          → BRA-1
+brasil-01         → BRA-1
+Alemanha 5        → GER-5
 Costa do Marfim 2 → CIV-2
-FWC-0           → FWC-0
-CC-14           → CC-14
+FWC-0             → FWC-0
+CC-14             → CC-14
 ```
 
 ---
@@ -43,7 +43,7 @@ CC-14           → CC-14
 
 ### Figurinhas Brilhantes
 
-São consideradas "brilhantes" a figurinha de **número 1** de cada seleção dos grupos A–L,
+São consideradas "brilhantes" a figurinha de **número 1** de cada seleção dos grupos A–L
 e **todas as figurinhas FWC**. O comando `/progresso` lista as brilhantes que ainda faltam.
 
 ---
@@ -75,7 +75,7 @@ models/                    ← Dataclasses tipadas: Figurinha, Movimentacao, Pro
 views/message_templates.py ← Todas as strings enviadas ao usuário
 exceptions/                ← CodigoInvalidoError, FigurinhaNaoEncontradaError, etc.
 database/
-  connection.py            ← ConnectionPool Singleton (schema configurável via search_path)
+  connection.py            ← ConnectionPool Singleton (search_path configurado via POSTGRES_SCHEMA)
   migrations/              ← 4 migrations SQL idempotentes
   homelab_init/            ← Script de inicialização do container Docker
 seeds/                     ← album_data.py (fonte única de verdade) + script de seed
@@ -88,14 +88,18 @@ Regras de negócio residem exclusivamente na camada de serviço — nunca em SQL
 
 ---
 
-## Deploy com Docker (produção)
+## Deploy com Docker
 
-> Para um guia completo com seção de manutenção e migração de dados, consulte [`docs/DEPLOY.md`](docs/DEPLOY.md).
+> Para referência completa (backup, acesso direto ao banco, migração de dados),
+> consulte [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ### Pré-requisitos
 
-- Docker 24+
-- Docker Compose v2 (`docker compose version`)
+| Requisito | Verificar com |
+|---|---|
+| Docker 24+ | `docker --version` |
+| Docker Compose v2 | `docker compose version` |
+| Git | `git --version` |
 
 ### 1. Clonar o repositório
 
@@ -104,37 +108,42 @@ git clone <url-do-repositorio>
 cd BotFigurinhas
 ```
 
-### 2. Configurar o arquivo `.env`
+### 2. Criar e preencher o `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Edite `.env` com suas credenciais:
+Abra o `.env` e preencha **todos** os campos marcados com `<CHANGE_ME>`:
 
-```dotenv
-# Telegram
-TELEGRAM_BOT_TOKEN=<token obtido com o @BotFather>
+| Variável | O que preencher |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token obtido com o [@BotFather](https://t.me/BotFather) |
+| `POSTGRES_PASSWORD` | Senha para o usuário de aplicação do banco |
+| `POSTGRES_ADMIN_PASSWORD` | Senha para o superusuário interno do container |
 
-# Credenciais da aplicação (usadas pelo bot)
-POSTGRES_HOST=db
-POSTGRES_PORT=5432
-POSTGRES_DB=homelab
-POSTGRES_USER=lg.admin
-POSTGRES_PASSWORD=<senha-forte>
-POSTGRES_SCHEMA=AlbumCopa2026
+Os demais campos já possuem valores sugeridos (`POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_SCHEMA`, etc.) e podem ser mantidos ou ajustados conforme sua preferência.
 
-# Superusuário interno do container (usado apenas na inicialização)
-POSTGRES_ADMIN_USER=postgres
-POSTGRES_ADMIN_PASSWORD=<senha-forte>
+> ⚠️ `POSTGRES_HOST` deve permanecer `db` ao rodar via Docker Compose — é o nome
+> interno do serviço de banco de dados na rede do container.
+>
+> ⚠️ O arquivo `.env` está no `.gitignore` e **nunca deve ser commitado**.
 
-# Pool de conexões
-DB_POOL_MIN=1
-DB_POOL_MAX=10
+### Como as credenciais fluem
+
 ```
-
-> ⚠️ `POSTGRES_HOST` deve ser `db` (nome do serviço no Docker Compose).
-> O arquivo `.env` está no `.gitignore` e nunca deve ser commitado.
+.env
+ ├── POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_SCHEMA
+ │     ├── lidos pelo bot (config/settings.py) → pool de conexões
+ │     └── repassados ao container do banco como POSTGRES_APP_USER /
+ │           POSTGRES_APP_PASSWORD / POSTGRES_SCHEMA (via docker-compose.yml)
+ │               └── usados pelo script database/homelab_init/00_setup.sh
+ │                   para criar o role e o schema na primeira inicialização
+ └── POSTGRES_ADMIN_USER / POSTGRES_ADMIN_PASSWORD
+       └── usados pelo container PostgreSQL como superusuário interno
+           (apenas na inicialização — nunca expostos ao bot)
+```
 
 ### 3. Subir os containers
 
@@ -142,37 +151,47 @@ DB_POOL_MAX=10
 docker compose -f docker-compose.yml up -d --build
 ```
 
-Na **primeira execução**, o PostgreSQL roda automaticamente o script
+Na **primeira execução**, o PostgreSQL roda automaticamente
 `database/homelab_init/00_setup.sh`, que:
 
-1. Cria o role de aplicação `"lg.admin"`
-2. Cria o schema `"AlbumCopa2026"` e transfere a propriedade
-3. Aplica as 4 migrations em sequência dentro do schema
+1. Cria o role de aplicação definido em `POSTGRES_USER`
+2. Cria o schema definido em `POSTGRES_SCHEMA` e transfere a propriedade
+3. Aplica as 4 migrations SQL em sequência dentro do schema
 4. Concede as permissões necessárias ao role de aplicação
 
-Nas execuções seguintes o script é ignorado (volume `pgdata` já existe).
+Nas execuções seguintes o script é ignorado — o volume `pgdata` já existe
+e os dados são preservados.
 
 ### 4. Verificar o status
 
 ```bash
+# Ver se os dois containers estão rodando
 docker compose ps
+
+# Acompanhar os logs do banco (útil na primeira execução)
+docker compose logs db
+
+# Acompanhar os logs do bot
 docker compose logs -f bot
 ```
 
 O bot está pronto quando o log exibir `Application started`.
 
-### 5. Atualizações
+### 5. Atualizar para uma nova versão
 
 ```bash
 git pull
 docker compose -f docker-compose.yml up -d --build bot
 ```
 
+O banco **não** é reinicializado — o volume `pgdata` persiste os dados entre atualizações.
+
 ---
 
 ## Desenvolvimento local
 
-O `docker-compose.override.yml` ativa hot reload e expõe a porta do Postgres:
+O `docker-compose.override.yml` ativa hot reload e expõe a porta do PostgreSQL
+para acesso direto via cliente local (ex: DBeaver, psql):
 
 ```bash
 docker compose up   # usa o override automaticamente
@@ -180,7 +199,7 @@ docker compose up   # usa o override automaticamente
 
 ---
 
-## Configuração manual (sem Docker)
+## Execução sem Docker
 
 ### 1. Instalar dependências
 
@@ -192,17 +211,22 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Editar com POSTGRES_HOST=localhost e credenciais do seu banco local
+# Editar: POSTGRES_HOST=localhost e credenciais do seu banco local
 ```
 
-### 3. Aplicar migrations
+### 3. Criar o schema e aplicar migrations
 
 ```bash
-psql -h localhost -U <usuario> -d <banco> \
-  -f database/migrations/001_initial_schema.sql \
-  -f database/migrations/002_per_user_album.sql \
-  -f database/migrations/003_add_pagina_to_figurinhas.sql \
-  -f database/migrations/004_update_pagina_values.sql
+# Criar o schema manualmente no PostgreSQL
+psql -h localhost -U <admin> -d <banco> \
+  -c 'CREATE SCHEMA IF NOT EXISTS "AlbumCopa2026";'
+
+# Aplicar as migrations dentro do schema
+for f in 001 002 003 004; do
+  PGOPTIONS='-c search_path="AlbumCopa2026"' \
+    psql -h localhost -U <usuario> -d <banco> \
+    -f database/migrations/${f}_*.sql
+done
 ```
 
 ### 4. Iniciar o bot
@@ -216,7 +240,7 @@ python main.py
 ## Testes
 
 ```bash
-# Variáveis do banco de teste
+# Configurar variáveis do banco de teste
 export POSTGRES_TEST_HOST=localhost
 export POSTGRES_TEST_DB=album_copa_test
 export POSTGRES_TEST_USER=<usuario>
@@ -256,18 +280,18 @@ tests/
 
 ## Variáveis de ambiente
 
-| Variável | Obrigatória | Padrão | Descrição |
+| Variável | Obrigatória | Sugestão de valor | Descrição |
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | Sim | — | Token do bot (obtido com o @BotFather) |
-| `POSTGRES_HOST` | Sim | — | Host do banco (`db` em produção Docker) |
+| `POSTGRES_HOST` | Sim | `db` | Host do banco (`db` em Docker, `localhost` sem Docker) |
 | `POSTGRES_PORT` | Não | `5432` | Porta PostgreSQL |
-| `POSTGRES_DB` | Sim | — | Nome do banco (`homelab`) |
-| `POSTGRES_USER` | Sim | — | Usuário de aplicação (`lg.admin`) |
+| `POSTGRES_DB` | Sim | `homelab` | Nome do banco de dados |
+| `POSTGRES_USER` | Sim | `lg.admin` | Usuário de aplicação (role no PostgreSQL) |
 | `POSTGRES_PASSWORD` | Sim | — | Senha do usuário de aplicação |
-| `POSTGRES_SCHEMA` | Sim | — | Schema do projeto (`AlbumCopa2026`) |
-| `POSTGRES_ADMIN_USER` | Sim¹ | — | Superusuário do container (`postgres`) |
-| `POSTGRES_ADMIN_PASSWORD` | Sim¹ | — | Senha do superusuário |
+| `POSTGRES_SCHEMA` | Sim | `AlbumCopa2026` | Schema onde as tabelas são criadas |
+| `POSTGRES_ADMIN_USER` | Sim¹ | `postgres` | Superusuário interno do container |
+| `POSTGRES_ADMIN_PASSWORD` | Sim¹ | — | Senha do superusuário do container |
 | `DB_POOL_MIN` | Não | `1` | Conexões mínimas no pool |
 | `DB_POOL_MAX` | Não | `10` | Conexões máximas no pool |
 
-¹ Necessário apenas para o deploy com Docker (inicialização do container).
+¹ Necessário apenas para o deploy com Docker. Não é usado pelo bot em execução.
