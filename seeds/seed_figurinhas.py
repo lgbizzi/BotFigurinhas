@@ -1,7 +1,8 @@
 """Seed script: populate the ``figurinhas`` table from :mod:`seeds.album_data`.
 
 Idempotent — re-running this script never duplicates rows because the INSERT
-uses ``ON CONFLICT (codigo_figurinha) DO NOTHING``.
+uses ``ON CONFLICT (telegram_user_id, codigo_figurinha) DO NOTHING``.
+Each row is scoped to ``telegram_user_id = 0`` (the canonical seed user).
 
 Usage::
 
@@ -28,7 +29,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 import psycopg2
 
 from database.connection import ConnectionPool, ConnectionPoolError
-from seeds.album_data import ALBUM_GROUPS, TOTAL_FIGURINHAS
+from seeds.album_data import ALBUM_GROUPS, AlbumGroup, TOTAL_FIGURINHAS
 
 # ---------------------------------------------------------------------------
 # Logging configuration
@@ -47,11 +48,13 @@ _TABLE_FIGURINHAS = "figurinhas"
 
 _SQL_INSERT_FIGURINHA = f"""
 INSERT INTO {_TABLE_FIGURINHAS}
-    (grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade)
+    (telegram_user_id, grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade, pagina)
 VALUES
-    (%(grupo)s, %(codigo_selecao)s, %(nome_selecao)s, %(numero)s, %(codigo_figurinha)s, 0)
-ON CONFLICT (codigo_figurinha) DO NOTHING;
+    (%(telegram_user_id)s, %(grupo)s, %(codigo_selecao)s, %(nome_selecao)s, %(numero)s, %(codigo_figurinha)s, 0, %(pagina)s)
+ON CONFLICT (telegram_user_id, codigo_figurinha) DO NOTHING;
 """
+
+_SEED_USER_ID: int = 0  # Canonical seed user — base album catalogue, not a real user
 
 
 # ---------------------------------------------------------------------------
@@ -59,72 +62,80 @@ ON CONFLICT (codigo_figurinha) DO NOTHING;
 # ---------------------------------------------------------------------------
 
 
+def _seed_group(cur: psycopg2.extensions.cursor, group: AlbumGroup) -> int:
+    """Insert all stickers for a single album group using ``cur``.
+
+    Args:
+        cur: Open psycopg2 cursor within the current transaction.
+        group: Album group whose stickers should be inserted.
+
+    Returns:
+        Number of rows actually inserted (skipped rows count as 0).
+    """
+    group_inserted = 0
+    for numero in group.numeros:
+        cur.execute(
+            _SQL_INSERT_FIGURINHA,
+            {
+                "telegram_user_id": _SEED_USER_ID,
+                "grupo": group.grupo,
+                "codigo_selecao": group.codigo_selecao,
+                "nome_selecao": group.nome_selecao,
+                "numero": numero,
+                "codigo_figurinha": f"{group.codigo_selecao}-{numero}",
+                "pagina": group.get_pagina(numero),
+            },
+        )
+        group_inserted += cur.rowcount
+    return group_inserted
+
+
+def _seed_all_groups(cur: psycopg2.extensions.cursor) -> int:
+    """Iterate over all album groups and insert their stickers.
+
+    Args:
+        cur: Open psycopg2 cursor within the current transaction.
+
+    Returns:
+        Total number of rows inserted across all groups.
+    """
+    total = 0
+    for group in ALBUM_GROUPS:
+        group_inserted = _seed_group(cur, group)
+        total += group_inserted
+        logger.info(
+            "Group %-3s | %-5s | %-25s | %2d/%2d rows inserted",
+            group.grupo, group.codigo_selecao, group.nome_selecao,
+            group_inserted, len(group.numeros),
+        )
+    return total
+
+
 def seed_figurinhas() -> None:
     """Insert all album stickers into the ``figurinhas`` table.
 
-    Iterates over every entry in :data:`seeds.album_data.ALBUM_GROUPS`,
-    builds the ``codigo_figurinha`` key (``<codigo_selecao>-<numero>``), and
-    performs a conflict-safe INSERT.  Progress is logged per group and a
-    summary is printed at the end.
+    Delegates per-group insertion to :func:`_seed_all_groups` and wraps the
+    whole operation in a single connection-level transaction.
 
     Raises:
         ConnectionPoolError: If the database connection pool cannot be
             initialised.
         psycopg2.DatabaseError: If any SQL statement fails unexpectedly.
     """
-    logger.info(
-        "Starting seed — %d stickers to process across %d entries.",
-        TOTAL_FIGURINHAS,
-        len(ALBUM_GROUPS),
-    )
-
+    logger.info("Starting seed — %d stickers to process across %d entries.", TOTAL_FIGURINHAS, len(ALBUM_GROUPS))
     pool = ConnectionPool.get_instance()
     conn = pool.get_connection()
-
     total_inserted = 0
-
     try:
         with conn:  # auto-commits on success, rolls back on exception
             with conn.cursor() as cur:
-                for group in ALBUM_GROUPS:
-                    group_inserted = 0
-
-                    for numero in group.numeros:
-                        codigo_figurinha = f"{group.codigo_selecao}-{numero}"
-                        cur.execute(
-                            _SQL_INSERT_FIGURINHA,
-                            {
-                                "grupo": group.grupo,
-                                "codigo_selecao": group.codigo_selecao,
-                                "nome_selecao": group.nome_selecao,
-                                "numero": numero,
-                                "codigo_figurinha": codigo_figurinha,
-                            },
-                        )
-                        group_inserted += cur.rowcount  # 1 if inserted, 0 if skipped
-
-                    total_inserted += group_inserted
-                    logger.info(
-                        "Group %-3s | %-5s | %-25s | %2d/%2d rows inserted",
-                        group.grupo,
-                        group.codigo_selecao,
-                        group.nome_selecao,
-                        group_inserted,
-                        len(group.numeros),
-                    )
-
+                total_inserted = _seed_all_groups(cur)
     except psycopg2.DatabaseError as exc:
         logger.exception("Database error during seed: %s", exc)
         raise
     finally:
         pool.release_connection(conn)
-
-    logger.info(
-        "Seed complete — %d/%d stickers inserted (skipped: %d).",
-        total_inserted,
-        TOTAL_FIGURINHAS,
-        TOTAL_FIGURINHAS - total_inserted,
-    )
+    logger.info("Seed complete — %d/%d stickers inserted (skipped: %d).", total_inserted, TOTAL_FIGURINHAS, TOTAL_FIGURINHAS - total_inserted)
 
 
 # ---------------------------------------------------------------------------

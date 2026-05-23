@@ -7,3 +7,6 @@ dist/
 build/
 .venv/
 venv/
+
+# Scripts de teste manual com credenciais hardcoded
+test_send.py

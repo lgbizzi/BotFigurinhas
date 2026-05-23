@@ -23,6 +23,7 @@ class Figurinha:
         codigo_figurinha: Unique sticker code in ``<code>-<number>`` format
             (e.g. ``"BRA-1"``, ``"FWC-0"``).
         quantidade: Current quantity owned by the user.
+        pagina: Physical album page where this sticker is located.
         created_at: Timestamp of row creation (UTC-aware).
         updated_at: Timestamp of the last row update (UTC-aware).
     """
@@ -34,6 +35,7 @@ class Figurinha:
     numero: int
     codigo_figurinha: str
     quantidade: int
+    pagina: int
     created_at: datetime
     updated_at: datetime
 
@@ -45,10 +47,10 @@ class Figurinha:
         queries::
 
             id, grupo, codigo_selecao, nome_selecao, numero,
-            codigo_figurinha, quantidade, created_at, updated_at
+            codigo_figurinha, quantidade, pagina, created_at, updated_at
 
         Args:
-            row: A tuple with exactly 9 elements as returned by psycopg2.
+            row: A tuple with exactly 10 elements as returned by psycopg2.
 
         Returns:
             A fully populated :class:`Figurinha` instance.
@@ -57,7 +59,7 @@ class Figurinha:
             ValueError: If *row* does not contain the expected number of
                 elements.
         """
-        _EXPECTED_COLUMNS = 9
+        _EXPECTED_COLUMNS = 10
         if len(row) != _EXPECTED_COLUMNS:
             raise ValueError(
                 f"Figurinha.from_row expects {_EXPECTED_COLUMNS} columns, "
@@ -71,6 +73,7 @@ class Figurinha:
             numero=row[4],
             codigo_figurinha=row[5],
             quantidade=row[6],
-            created_at=row[7],
-            updated_at=row[8],
+            pagina=row[7],
+            created_at=row[8],
+            updated_at=row[9],
         )

@@ -33,17 +33,17 @@ import pytest
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-_MIGRATION_PATH = (
-    pathlib.Path(__file__).parent.parent
-    / "database"
-    / "migrations"
-    / "001_initial_schema.sql"
-)
+_MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "database" / "migrations"
+
+_MIGRATION_001_PATH = _MIGRATIONS_DIR / "001_initial_schema.sql"
+_MIGRATION_002_PATH = _MIGRATIONS_DIR / "002_per_user_album.sql"
+_MIGRATION_003_PATH = _MIGRATIONS_DIR / "003_add_pagina_to_figurinhas.sql"
 
 _SEED_FIGURINHA_SQL = """
-INSERT INTO figurinhas (grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade)
-VALUES ('C', 'BRA', 'Brasil', 1, 'BRA-1', 0)
-ON CONFLICT (codigo_figurinha) DO NOTHING;
+INSERT INTO figurinhas
+    (telegram_user_id, grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade, pagina)
+VALUES (0, 'C', 'BRA', 'Brasil', 1, 'BRA-1', 0, 24)
+ON CONFLICT (telegram_user_id, codigo_figurinha) DO NOTHING;
 """
 
 
@@ -62,6 +62,39 @@ def _get_test_dsn() -> dict[str, object]:
     }
 
 
+def _aplicar_migracoes(conn: psycopg2.extensions.connection) -> None:
+    """Apply all schema migrations and seed the minimum test row.
+
+    Migrations 002 and 003 are applied only when their files exist so that the
+    test suite can run in intermediate development states.
+
+    Args:
+        conn: Open psycopg2 connection; committed on success.
+    """
+    with conn.cursor() as cur:
+        cur.execute(_MIGRATION_001_PATH.read_text(encoding="utf-8"))
+        if _MIGRATION_002_PATH.exists():
+            cur.execute(_MIGRATION_002_PATH.read_text(encoding="utf-8"))
+        if _MIGRATION_003_PATH.exists():
+            cur.execute(_MIGRATION_003_PATH.read_text(encoding="utf-8"))
+        cur.execute(_SEED_FIGURINHA_SQL)
+    conn.commit()
+
+
+def _limpar_schema(conn: psycopg2.extensions.connection) -> None:
+    """Drop all test tables and close the connection.
+
+    Args:
+        conn: Open psycopg2 connection; closed after teardown.
+    """
+    with conn.cursor() as cur:
+        cur.execute("DROP TABLE IF EXISTS movimentacoes CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS figurinhas CASCADE;")
+        cur.execute("DROP FUNCTION IF EXISTS fn_figurinhas_set_updated_at() CASCADE;")
+    conn.commit()
+    conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Session-scoped: real PostgreSQL connection
 # ---------------------------------------------------------------------------
@@ -73,8 +106,9 @@ def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
 
     Lifecycle (once per pytest session):
     1. Connect to the test database specified by ``POSTGRES_TEST_*`` env vars.
-    2. Apply ``001_initial_schema.sql`` to create all tables, indexes, and triggers.
-    3. Insert the minimum seed row (BRA-1) required by repository tests.
+    2. Apply migrations in order: 001 (schema), 002 (per-user album), 003 (pagina).
+       Migrations 002 and 003 are applied conditionally if the files exist.
+    3. Insert the minimum seed row (BRA-1, telegram_user_id=0) required by tests.
     4. Yield the open connection to all tests.
     5. On teardown drop all test tables and close the connection.
 
@@ -88,23 +122,11 @@ def db_connection() -> Generator[psycopg2.extensions.connection, None, None]:
     dsn = _get_test_dsn()
     conn = psycopg2.connect(**dsn)
     conn.autocommit = False
-
-    # --- Schema creation ---
-    migration_sql = _MIGRATION_PATH.read_text(encoding="utf-8")
-    with conn.cursor() as cur:
-        cur.execute(migration_sql)
-        cur.execute(_SEED_FIGURINHA_SQL)
-    conn.commit()
+    _aplicar_migracoes(conn)
 
     yield conn
 
-    # --- Teardown: drop all tables in dependency order ---
-    with conn.cursor() as cur:
-        cur.execute("DROP TABLE IF EXISTS movimentacoes CASCADE;")
-        cur.execute("DROP TABLE IF EXISTS figurinhas CASCADE;")
-        cur.execute("DROP FUNCTION IF EXISTS fn_figurinhas_set_updated_at() CASCADE;")
-    conn.commit()
-    conn.close()
+    _limpar_schema(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -127,10 +149,12 @@ def db_transaction(db_connection: psycopg2.extensions.connection) -> Generator[N
     Yields:
         Nothing — the fixture provides isolation as a side-effect.
     """
-    db_connection.execute("SAVEPOINT test_savepoint;")
+    with db_connection.cursor() as cur:
+        cur.execute("SAVEPOINT test_savepoint;")
     yield
-    db_connection.execute("ROLLBACK TO SAVEPOINT test_savepoint;")
-    db_connection.execute("RELEASE SAVEPOINT test_savepoint;")
+    with db_connection.cursor() as cur:
+        cur.execute("ROLLBACK TO SAVEPOINT test_savepoint;")
+        cur.execute("RELEASE SAVEPOINT test_savepoint;")
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +255,7 @@ def sample_figurinha():
         numero=1,
         codigo_figurinha="BRA-1",
         quantidade=0,
+        pagina=24,
         created_at=now,
         updated_at=now,
     )
