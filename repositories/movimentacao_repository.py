@@ -173,10 +173,7 @@ class MovimentacaoRepository(BaseRepository):
                 returning = cur.fetchone()
         except psycopg2.DatabaseError:
             self._conn.rollback()
-            logger.exception(
-                "insert: rollback after error — figurinha_id=%d tipo=%r quantidade=%d",
-                figurinha_id, tipo, quantidade,
-            )
+            logger.exception("insert: rollback — figurinha_id=%d tipo=%r qtd=%d", figurinha_id, tipo, quantidade)
             raise
 
         if returning is None:

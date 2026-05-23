@@ -86,6 +86,70 @@ class FigurinhaService:
             )
         return figurinha
 
+    def _persistir_mutacao(
+        self,
+        figurinha: Figurinha,
+        tipo: str,
+        quantidade: int,
+        entrada_bruta: str,
+        telegram_user_id: int,
+        telegram_username: str,
+    ) -> None:
+        """Persist a quantity update and the corresponding movement record.
+
+        Wraps the update, movement insert, and commit in a single try/except so
+        that callers of :meth:`adicionar` and :meth:`remover` share identical
+        error-handling behaviour.  Rolls back and re-raises on any failure.
+
+        Args:
+            figurinha: The sticker whose ``quantidade`` has already been mutated.
+            tipo: Movement direction — ``"ENTRADA"`` or ``"SAIDA"``.
+            quantidade: Number of stickers moved.
+            entrada_bruta: Raw text input as received from Telegram.
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram ``@username``.
+        """
+        try:
+            self._repo.update_quantidade(
+                figurinha_id=figurinha.id,
+                quantidade=figurinha.quantidade,
+                telegram_user_id=telegram_user_id,
+            )
+            self._mov_service.registrar(
+                figurinha_id=figurinha.id,
+                tipo=tipo,
+                quantidade=quantidade,
+                entrada_bruta=entrada_bruta,
+                telegram_user_id=telegram_user_id,
+                telegram_username=telegram_username,
+            )
+            self._repo.commit()
+        except Exception:
+            self._repo.rollback()
+            raise
+
+    @staticmethod
+    def _build_stickers_payload() -> list[dict]:
+        """Build the list of sticker dicts used to initialise a new album.
+
+        Returns:
+            List of dicts with keys ``grupo``, ``codigo_selecao``,
+            ``nome_selecao``, ``numero``, ``codigo_figurinha``, ``pagina``
+            for every sticker defined in :data:`seeds.album_data.ALBUM_GROUPS`.
+        """
+        return [
+            {
+                "grupo": group.grupo,
+                "codigo_selecao": group.codigo_selecao,
+                "nome_selecao": group.nome_selecao,
+                "numero": numero,
+                "codigo_figurinha": f"{group.codigo_selecao}-{numero}",
+                "pagina": group.get_pagina(numero),
+            }
+            for group in ALBUM_GROUPS
+            for numero in group.numeros
+        ]
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -98,7 +162,7 @@ class FigurinhaService:
         """Initialise the user's album on first use.
 
         Checks whether the user already has sticker rows in the database. If not,
-        inserts all 995 sticker records with quantidade=0.
+        inserts all 994 sticker records with quantidade=0.
 
         Args:
             telegram_user_id: Numeric Telegram user ID.
@@ -108,17 +172,7 @@ class FigurinhaService:
             return
 
         logger.info("garantir_album_inicializado: initialising album for user=%r", telegram_username)
-        stickers = [
-            {
-                "grupo": group.grupo,
-                "codigo_selecao": group.codigo_selecao,
-                "nome_selecao": group.nome_selecao,
-                "numero": numero,
-                "codigo_figurinha": f"{group.codigo_selecao}-{numero}",
-            }
-            for group in ALBUM_GROUPS
-            for numero in group.numeros
-        ]
+        stickers = self._build_stickers_payload()
         try:
             self._repo.inicializar_album(telegram_user_id, stickers)
             self._repo.commit()
@@ -163,33 +217,9 @@ class FigurinhaService:
         self._validar_quantidade(quantidade)
         codigo = self._parser.normalizar(entrada_bruta)
         figurinha = self._buscar_figurinha(codigo, telegram_user_id)
-
         figurinha.quantidade += quantidade
-        try:
-            self._repo.update_quantidade(
-                figurinha_id=figurinha.id,
-                quantidade=figurinha.quantidade,
-                telegram_user_id=telegram_user_id,
-            )
-            self._mov_service.registrar(
-                figurinha_id=figurinha.id,
-                tipo="ENTRADA",
-                quantidade=quantidade,
-                entrada_bruta=entrada_bruta,
-                telegram_user_id=telegram_user_id,
-                telegram_username=telegram_username,
-            )
-            self._repo.commit()
-        except Exception:
-            self._repo.rollback()
-            raise
-
-        logger.debug(
-            "adicionar: codigo=%r nova_quantidade=%d user=%r",
-            codigo,
-            figurinha.quantidade,
-            telegram_username,
-        )
+        self._persistir_mutacao(figurinha, "ENTRADA", quantidade, entrada_bruta, telegram_user_id, telegram_username)
+        logger.debug("adicionar: codigo=%r nova_quantidade=%d user=%r", codigo, figurinha.quantidade, telegram_username)
         return figurinha
 
     def remover(
@@ -232,31 +262,8 @@ class FigurinhaService:
             )
 
         figurinha.quantidade -= quantidade
-        try:
-            self._repo.update_quantidade(
-                figurinha_id=figurinha.id,
-                quantidade=figurinha.quantidade,
-                telegram_user_id=telegram_user_id,
-            )
-            self._mov_service.registrar(
-                figurinha_id=figurinha.id,
-                tipo="SAIDA",
-                quantidade=quantidade,
-                entrada_bruta=entrada_bruta,
-                telegram_user_id=telegram_user_id,
-                telegram_username=telegram_username,
-            )
-            self._repo.commit()
-        except Exception:
-            self._repo.rollback()
-            raise
-
-        logger.debug(
-            "remover: codigo=%r nova_quantidade=%d user=%r",
-            codigo,
-            figurinha.quantidade,
-            telegram_username,
-        )
+        self._persistir_mutacao(figurinha, "SAIDA", quantidade, entrada_bruta, telegram_user_id, telegram_username)
+        logger.debug("remover: codigo=%r nova_quantidade=%d user=%r", codigo, figurinha.quantidade, telegram_username)
         return figurinha
 
     def adicionar_lote(
