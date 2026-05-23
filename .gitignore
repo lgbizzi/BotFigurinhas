@@ -10,6 +10,7 @@ venv/
 
 # Scripts de teste manual com credenciais hardcoded
 test_send.py
+tests/test_telegram_send_message.py
 
 # Inserts de dados sensíveis
 database/migrations/insert_*.sql
