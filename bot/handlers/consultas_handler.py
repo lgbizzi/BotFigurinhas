@@ -82,6 +82,11 @@ def build_consultas_handlers(controller: BotController) -> list[CommandHandler]:
     async def cmd_faltantes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle the /faltantes command.
 
+        The controller returns one message string per album group.  Each
+        string is split further (if needed) to respect the Telegram
+        4 096-character limit, and every resulting chunk is sent as an
+        individual reply.
+
         Args:
             update: Incoming Telegram update.
             context: PTB context object (unused).
@@ -89,9 +94,10 @@ def build_consultas_handlers(controller: BotController) -> list[CommandHandler]:
         user = update.effective_user
         telegram_user_id: int = user.id if user else 0
         telegram_username: str = (user.username or "") if user else ""
-        result = controller.consultar_faltantes(telegram_user_id, telegram_username)
-        for chunk in _split_message(result):
-            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)  # type: ignore[union-attr]
+        mensagens = controller.consultar_faltantes(telegram_user_id, telegram_username)
+        for msg in mensagens:
+            for chunk in _split_message(msg):
+                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)  # type: ignore[union-attr]
 
     async def cmd_repetidas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle the /repetidas command.
@@ -103,9 +109,10 @@ def build_consultas_handlers(controller: BotController) -> list[CommandHandler]:
         user = update.effective_user
         telegram_user_id: int = user.id if user else 0
         telegram_username: str = (user.username or "") if user else ""
-        result = controller.consultar_repetidas(telegram_user_id, telegram_username)
-        for chunk in _split_message(result):
-            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)  # type: ignore[union-attr]
+        mensagens = controller.consultar_repetidas(telegram_user_id, telegram_username)
+        for msg in mensagens:
+            for chunk in _split_message(msg):
+                await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)  # type: ignore[union-attr]
 
     return [
         CommandHandler("progresso", cmd_progresso),
