@@ -73,6 +73,7 @@ DB_PORT: int = _optional_int("POSTGRES_PORT", 5432)
 DB_NAME: str = _require("POSTGRES_DB")
 DB_USER: str = _require("POSTGRES_USER")
 DB_PASSWORD: str = _require("POSTGRES_PASSWORD")
+DB_SCHEMA: str = _require("POSTGRES_SCHEMA")
 
 # ---------------------------------------------------------------------------
 # Optional settings with defaults

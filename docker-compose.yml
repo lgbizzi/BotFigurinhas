@@ -3,14 +3,18 @@ services:
     image: postgres:16-alpine
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Superusuário interno do container (não é o usuário da aplicação)
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d/
+      # Script de inicialização: cria schema, role e aplica migrations
+      - ./database/homelab_init:/docker-entrypoint-initdb.d/
+      # Migrations montadas separadamente para o script de init acessar
+      - ./database/migrations:/migrations/
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5

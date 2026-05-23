@@ -76,10 +76,11 @@ class ConnectionPool:
         """
         logger.info(
             "Initialising PostgreSQL connection pool — host=%s port=%d db=%s "
-            "pool_min=%d pool_max=%d",
+            "schema=%s pool_min=%d pool_max=%d",
             settings.DB_HOST,
             settings.DB_PORT,
             settings.DB_NAME,
+            settings.DB_SCHEMA,
             settings.DB_POOL_MIN,
             settings.DB_POOL_MAX,
         )
@@ -93,6 +94,7 @@ class ConnectionPool:
                     dbname=settings.DB_NAME,
                     user=settings.DB_USER,
                     password=settings.DB_PASSWORD,
+                    options=f'-c search_path="{settings.DB_SCHEMA}"',
                 )
             )
         except psycopg2.OperationalError as exc:
