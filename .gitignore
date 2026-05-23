@@ -10,3 +10,9 @@ venv/
 
 # Scripts de teste manual com credenciais hardcoded
 test_send.py
+
+# Inserts de dados sensíveis
+database/migrations/insert_*.sql
+
+# Metadados do Windows (Zone.Identifier)
+*:Zone.Identifier
