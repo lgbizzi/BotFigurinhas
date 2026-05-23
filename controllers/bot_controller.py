@@ -257,23 +257,32 @@ class BotController:
         """
         try:
             self._garantir_album(telegram_user_id, telegram_username)
-            return tmpl.formatar_progresso(self._query_service.progresso(telegram_user_id))
+            return tmpl.formatar_progresso(self._query_service.progresso_detalhado(telegram_user_id))
         except Exception:
             logger.exception("consultar_progresso: unexpected error")
             return tmpl.erro_generico()
 
-    def consultar_faltantes(self, telegram_user_id: int, telegram_username: str) -> str:
-        """Return a formatted list of missing stickers grouped by country.
+    def consultar_faltantes(self, telegram_user_id: int, telegram_username: str) -> list[str]:
+        """Return a list of formatted messages with missing stickers by group.
+
+        Each element of the returned list corresponds to one album group and
+        is intended to be sent as a separate Telegram message.  This avoids
+        the Telegram 4 096-character per-message limit when the faltantes list
+        is long.
 
         Delegates to :class:`~services.album_query_service.AlbumQueryService`
         and formats via :func:`~views.message_templates.formatar_faltantes`.
+
+        Never raises — any exception is caught and converted into a
+        single-element list containing a generic error message.
 
         Args:
             telegram_user_id: Numeric Telegram user ID.
             telegram_username: Telegram @username of the user.
 
         Returns:
-            Formatted faltantes message or a generic error message on failure.
+            List of Markdown strings ready to send, one per album group.
+            Returns ``[tmpl.erro_generico()]`` on unexpected failure.
         """
         try:
             self._garantir_album(telegram_user_id, telegram_username)
@@ -282,10 +291,10 @@ class BotController:
             return tmpl.formatar_faltantes(agrupados, progresso)
         except Exception:
             logger.exception("consultar_faltantes: unexpected error")
-            return tmpl.erro_generico()
+            return [tmpl.erro_generico()]
 
-    def consultar_repetidas(self, telegram_user_id: int, telegram_username: str) -> str:
-        """Return a formatted list of repeated stickers.
+    def consultar_repetidas(self, telegram_user_id: int, telegram_username: str) -> list[str]:
+        """Return a formatted list of repeated stickers grouped by album group.
 
         Delegates to :class:`~services.album_query_service.AlbumQueryService`
         and formats via :func:`~views.message_templates.formatar_repetidas`.
@@ -295,11 +304,13 @@ class BotController:
             telegram_username: Telegram @username of the user.
 
         Returns:
-            Formatted repetidas message or a generic error message on failure.
+            List of Markdown strings (one per album group) or a single-element
+            list with a generic error message on failure.
         """
         try:
             self._garantir_album(telegram_user_id, telegram_username)
-            return tmpl.formatar_repetidas(self._query_service.repetidas(telegram_user_id))
+            agrupadas = self._query_service.repetidas_agrupadas(telegram_user_id)
+            return tmpl.formatar_repetidas(agrupadas)
         except Exception:
             logger.exception("consultar_repetidas: unexpected error")
-            return tmpl.erro_generico()
+            return [tmpl.erro_generico()]

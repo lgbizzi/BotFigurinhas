@@ -15,6 +15,38 @@ if TYPE_CHECKING:
     from models.figurinha import Figurinha
     from models.progresso import Progresso
 
+# ---------------------------------------------------------------------------
+# Flag emoji mapping  (keyed by codigo_selecao)
+# ---------------------------------------------------------------------------
+
+_BANDEIRAS: dict[str, str] = {
+    "MEX": "🇲🇽", "RSA": "🇿🇦", "KOR": "🇰🇷", "CZE": "🇨🇿",
+    "CAN": "🇨🇦", "BIH": "🇧🇦", "QAT": "🇶🇦", "SUI": "🇨🇭",
+    "BRA": "🇧🇷", "MAR": "🇲🇦", "HAI": "🇭🇹", "SCO": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+    "USA": "🇺🇸", "PAR": "🇵🇾", "AUS": "🇦🇺", "TUR": "🇹🇷",
+    "GER": "🇩🇪", "CUW": "🇨🇼", "CIV": "🇨🇮", "ECU": "🇪🇨",
+    "NED": "🇳🇱", "JPN": "🇯🇵", "SWE": "🇸🇪", "TUN": "🇹🇳",
+    "BEL": "🇧🇪", "EGY": "🇪🇬", "IRN": "🇮🇷", "NZL": "🇳🇿",
+    "ESP": "🇪🇸", "CPV": "🇨🇻", "KSA": "🇸🇦", "URU": "🇺🇾",
+    "FRA": "🇫🇷", "SEN": "🇸🇳", "IRQ": "🇮🇶", "NOR": "🇳🇴",
+    "ARG": "🇦🇷", "ALG": "🇩🇿", "AUT": "🇦🇹", "JOR": "🇯🇴",
+    "POR": "🇵🇹", "COD": "🇨🇩", "UZB": "🇺🇿", "COL": "🇨🇴",
+    "ENG": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "CRO": "🇭🇷", "GHA": "🇬🇭", "PAN": "🇵🇦",
+    "FWC": "🏆", "CC": "🥤",
+}
+
+
+def bandeira(codigo_selecao: str) -> str:
+    """Return the flag emoji for the given selection code, or empty string.
+
+    Args:
+        codigo_selecao: Two-to-three-letter selection code (e.g. ``"BRA"``).
+
+    Returns:
+        Flag emoji string, or ``""`` when the code is unknown.
+    """
+    return _BANDEIRAS.get(codigo_selecao, "")
+
 
 def confirmar_adicionar(
     nome_selecao: str,
@@ -272,6 +304,21 @@ def formatar_resultado_lote(
     return "\n".join(linhas)
 
 
+def _formatar_top3(itens: tuple[tuple[str, int], ...], vazio: str) -> str:
+    """Render a top-3 selection list as bullet lines.
+
+    Args:
+        itens: Sequence of ``(nome_selecao, qtd_faltantes)`` tuples.
+        vazio: Line to use when *itens* is empty.
+
+    Returns:
+        Multi-line string with one bullet per item, or *vazio* when empty.
+    """
+    if not itens:
+        return vazio
+    return "\n".join(f"• {nome}: {qtd} faltando" for nome, qtd in itens)
+
+
 def formatar_progresso(progresso: Progresso) -> str:
     """Format the album completion progress for display.
 
@@ -281,73 +328,93 @@ def formatar_progresso(progresso: Progresso) -> str:
     Returns:
         Multi-line Markdown string summarising album completion.
     """
-    return (
-        "📊 *Progresso do Álbum Copa 2026*\n\n"
-        f"🎯 {progresso.percentual}% completo\n"
-        f"✅ {progresso.tipos_possuidos} de {progresso.total_album} figurinhas únicas\n"
-        f"📦 {f'{progresso.total_exemplares:,}'.replace(',', '.')} exemplares no total\n"
-        f"❌ {progresso.tipos_faltantes} figurinhas ainda faltando"
+    _sem_incompletas = "• Nenhuma seleção incompleta 🎉"
+    proximos = _formatar_top3(progresso.top3_proximos, _sem_incompletas)
+    distantes = _formatar_top3(progresso.top3_distantes, _sem_incompletas)
+
+    brilhantes = progresso.brilhantes_faltantes
+    brilhantes_txt = (
+        " ".join(brilhantes) if brilhantes else "• Todos os brilhantes coletados! ✨"
     )
+    cc = progresso.cc_faltantes
+    cc_txt = " ".join(cc) if cc else "• Nenhum CC faltando! 🎉"
 
-
-def _formatar_grupo_faltantes(grupo: str, selecoes: dict[str, list[Figurinha]]) -> str:
-    """Format a single grupo block for the faltantes message.
-
-    Args:
-        grupo: Album group label (e.g. ``"A"``).
-        selecoes: Dict mapping ``nome_selecao`` to the list of missing figurinhas.
-
-    Returns:
-        Formatted block with group header and per-selection lines.
-    """
-    linhas = [f"*Grupo {grupo}*"]
-    for nome_selecao in sorted(selecoes):
-        count = len(selecoes[nome_selecao])
-        linhas.append(f"  • {nome_selecao} — {count} faltando")
-    return "\n".join(linhas)
+    return (
+        "*Seu álbum Copa 2026* 🏆\n\n"
+        f"📊 *{progresso.percentual}% completo*\n"
+        f"📌 {progresso.tipos_possuidos} de 994 figurinhas únicas\n"
+        f"❌ {progresso.tipos_faltantes} figurinhas ainda faltando\n"
+        f"📦 {progresso.total_exemplares} figurinhas no total\n\n"
+        f"🌍 *{progresso.paises_completos} países completos*\n\n"
+        f"🔜 *Mais próximos de completar:*\n{proximos}\n\n"
+        f"🔚 *Mais distantes de completar:*\n{distantes}\n\n"
+        f"⭐ *Brilhantes faltantes ({len(brilhantes)}):*\n{brilhantes_txt}\n\n"
+        f"🥤 *CC faltantes ({len(cc)}):*\n{cc_txt}"
+    )
 
 
 def formatar_faltantes(
-    agrupados: dict[str, dict[str, list[Figurinha]]],
+    grupos: list[tuple[str, list[tuple[str, str, list[Figurinha]]]]],
     progresso: Progresso,
-) -> str:
-    """Format the missing stickers list grouped by album group and selection.
+) -> list[str]:
+    """Format the missing stickers list grouped by album group.
+
+    Produces one Telegram message per album group (A–L, FWC, CC).  Each
+    message starts with a bold group header followed by one country block per
+    country in the group.
 
     Args:
-        agrupados: Nested dict ``{grupo: {nome_selecao: [Figurinha, ...]}}``.
-        progresso: :class:`~models.progresso.Progresso` for summary counts.
+        grupos: Page-ordered list of ``(group_header, [(nome, codigo, figs)])``
+            as returned by ``AlbumQueryService.faltantes_agrupados``.
+        progresso: :class:`~models.progresso.Progresso` (used only when
+            ``grupos`` is empty to decide the completion message).
 
     Returns:
-        Multi-line Markdown string listing missing stickers per group.
-        Returns a completion congratulation when ``agrupados`` is empty.
+        List of Markdown strings, one per album group.  When the album is
+        complete the list contains a single congratulatory string.
     """
-    if not agrupados:
-        return "✅ Parabéns! Álbum completo!"
+    if not grupos:
+        return ["✅ Parabéns! Álbum completo!"]
 
-    cabecalho = (
-        f"📋 *Figurinhas Faltantes — "
-        f"{progresso.tipos_faltantes} de {progresso.total_album}*\n"
-    )
-    blocos = [_formatar_grupo_faltantes(g, agrupados[g]) for g in sorted(agrupados)]
-    return cabecalho + "\n" + "\n\n".join(blocos)
+    mensagens: list[str] = []
+    for group_header, secoes in grupos:
+        linhas: list[str] = [f"*Faltantes - {group_header}:*"]
+        for nome, codigo, figs in secoes:
+            flag = bandeira(codigo)
+            prefix = f"{flag} " if flag else ""
+            linhas.append(f"\n*{prefix}{nome}:*")
+            linhas.extend(f.codigo_figurinha for f in figs)
+        mensagens.append("\n".join(linhas))
+    return mensagens
 
 
-def formatar_repetidas(repetidas: list[Figurinha]) -> str:
-    """Format the list of repeated stickers (quantidade > 1).
+def formatar_repetidas(
+    grupos: list[tuple[str, list[tuple[str, str, list[Figurinha]]]]],
+) -> list[str]:
+    """Format repeated stickers grouped by album group.
+
+    Produces one Telegram message per album group (A–L, FWC, CC).  Each
+    message starts with a bold group header followed by one country block per
+    country, listing each repeated sticker code.
 
     Args:
-        repetidas: List of :class:`~models.figurinha.Figurinha` with ``quantidade > 1``.
+        grupos: Page-ordered list of ``(group_header, [(nome, codigo, figs)])``
+            as returned by ``AlbumQueryService.repetidas_agrupadas``.
 
     Returns:
-        Multi-line Markdown string listing each repeated sticker.
-        Returns an informational message when the list is empty.
+        List of Markdown strings, one per album group.  Returns a single
+        informational message when there are no repeated stickers.
     """
-    if not repetidas:
-        return "ℹ️ Nenhuma figurinha repetida."
+    if not grupos:
+        return ["ℹ️ Nenhuma figurinha repetida."]
 
-    cabecalho = f"🔄 *Figurinhas Repetidas — {len(repetidas)} tipos*\n"
-    linhas = [
-        f"• {f.codigo_figurinha} ({f.nome_selecao}) — {f.quantidade}×"
-        for f in repetidas
-    ]
-    return cabecalho + "\n" + "\n".join(linhas)
+    mensagens: list[str] = []
+    for group_header, secoes in grupos:
+        linhas: list[str] = [f"*Repetidas - {group_header}:*"]
+        for nome, codigo, figs in secoes:
+            flag = bandeira(codigo)
+            prefix = f"{flag} " if flag else ""
+            linhas.append(f"\n*{prefix}{nome}:*")
+            linhas.extend(f.codigo_figurinha for f in figs)
+        mensagens.append("\n".join(linhas))
+    return mensagens

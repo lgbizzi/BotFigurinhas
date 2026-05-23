@@ -23,7 +23,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _SELECT_COLS = (
     "id, grupo, codigo_selecao, nome_selecao, numero, "
-    "codigo_figurinha, quantidade, created_at, updated_at"
+    "codigo_figurinha, quantidade, pagina, created_at, updated_at"
+)
+
+_SQL_INIT_ALBUM = (
+    "INSERT INTO figurinhas "
+    "(telegram_user_id, grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade, pagina) "
+    "VALUES (%s, %s, %s, %s, %s, %s, 0, %s) "
+    "ON CONFLICT (telegram_user_id, codigo_figurinha) DO NOTHING"
 )
 
 
@@ -112,21 +119,11 @@ class FigurinhaRepository(BaseRepository):
             row = cur.fetchone()
 
         if row is None:
-            logger.debug(
-                "find_by_par: selecao=%r numero=%d user=%d not found",
-                codigo_selecao,
-                numero,
-                telegram_user_id,
-            )
+            logger.debug("find_by_par: selecao=%r numero=%d user=%d not found", codigo_selecao, numero, telegram_user_id)
             return None
 
         figurinha = Figurinha.from_row(row)
-        logger.debug(
-            "find_by_par: found figurinha id=%d selecao=%r numero=%d",
-            figurinha.id,
-            codigo_selecao,
-            numero,
-        )
+        logger.debug("find_by_par: found id=%d selecao=%r numero=%d", figurinha.id, codigo_selecao, numero)
         return figurinha
 
     # ------------------------------------------------------------------
@@ -160,19 +157,10 @@ class FigurinhaRepository(BaseRepository):
         try:
             with self._conn.cursor() as cur:
                 cur.execute(sql, (quantidade, figurinha_id, telegram_user_id))
-            logger.debug(
-                "update_quantidade: figurinha_id=%d new_quantidade=%d user=%d",
-                figurinha_id,
-                quantidade,
-                telegram_user_id,
-            )
+            logger.debug("update_quantidade: id=%d new_qtd=%d user=%d", figurinha_id, quantidade, telegram_user_id)
         except psycopg2.DatabaseError:
             self._conn.rollback()
-            logger.exception(
-                "update_quantidade: rollback after error — figurinha_id=%d quantidade=%d",
-                figurinha_id,
-                quantidade,
-            )
+            logger.exception("update_quantidade: rollback — id=%d qtd=%d", figurinha_id, quantidade)
             raise
 
     # ------------------------------------------------------------------
@@ -182,8 +170,8 @@ class FigurinhaRepository(BaseRepository):
     def find_faltantes(self, telegram_user_id: int) -> list[Figurinha]:
         """Fetch all figurinhas the user still needs (quantidade = 0).
 
-        Results are ordered by ``grupo``, ``codigo_selecao``, and ``numero``
-        so that callers receive them in album order.
+        Results are ordered by ``pagina`` and ``numero`` so that callers
+        receive them in physical album page order.
 
         Args:
             telegram_user_id: Numeric Telegram user ID scoping the query.
@@ -194,7 +182,7 @@ class FigurinhaRepository(BaseRepository):
         sql = (
             f"SELECT {_SELECT_COLS} FROM figurinhas "
             "WHERE quantidade = 0 AND telegram_user_id = %s "
-            "ORDER BY grupo, codigo_selecao, numero"
+            "ORDER BY pagina, numero"
         )
         with self._conn.cursor() as cur:
             cur.execute(sql, (telegram_user_id,))
@@ -207,7 +195,8 @@ class FigurinhaRepository(BaseRepository):
     def find_repetidas(self, telegram_user_id: int) -> list[Figurinha]:
         """Fetch all figurinhas the user owns more than one copy of (quantidade > 1).
 
-        Results are ordered by ``codigo_selecao`` and ``numero``.
+        Results are ordered by ``pagina`` and ``numero`` so that callers
+        receive them in physical album page order.
 
         Args:
             telegram_user_id: Numeric Telegram user ID scoping the query.
@@ -218,7 +207,7 @@ class FigurinhaRepository(BaseRepository):
         sql = (
             f"SELECT {_SELECT_COLS} FROM figurinhas "
             "WHERE quantidade > 1 AND telegram_user_id = %s "
-            "ORDER BY codigo_selecao, numero"
+            "ORDER BY pagina, numero"
         )
         with self._conn.cursor() as cur:
             cur.execute(sql, (telegram_user_id,))
@@ -251,20 +240,79 @@ class FigurinhaRepository(BaseRepository):
             cur.execute(sql, (telegram_user_id,))
             row = cur.fetchone()
 
-        total_album, tipos_possuidos, total_exemplares = row  # type: ignore[misc]
-        progresso = Progresso(
+        progresso = self._build_progresso(row)  # type: ignore[arg-type]
+        logger.debug("get_progresso: total=%d possuidos=%d user=%d", progresso.total_album, progresso.tipos_possuidos, telegram_user_id)
+        return progresso
+
+    def get_selecoes_faltantes_contagem(self, telegram_user_id: int) -> list[tuple[str, int]]:
+        """Return faltantes count per A–L selection, ordered ascending by faltantes.
+
+        Returns all selections regardless of completion state.  The caller is
+        responsible for filtering incomplete selections and limiting the result.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID scoping the query.
+
+        Returns:
+            List of ``(nome_selecao, qtd_faltantes)`` tuples for every A–L
+            selection, ordered by ``faltantes ASC``.
+        """
+        sql = (
+            "SELECT nome_selecao, COUNT(*) FILTER (WHERE quantidade = 0) AS faltantes "
+            "FROM figurinhas "
+            "WHERE telegram_user_id = %s AND grupo NOT IN ('FWC', 'CC') "
+            "GROUP BY codigo_selecao, nome_selecao "
+            "ORDER BY faltantes ASC"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql, (telegram_user_id,))
+            rows = cur.fetchall()
+        result = [(str(r[0]), int(r[1])) for r in rows]
+        logger.debug("get_selecoes_faltantes_contagem: %d entries user=%d", len(result), telegram_user_id)
+        return result
+
+    def get_cc_faltantes(self, telegram_user_id: int) -> list[str]:
+        """Return codes of missing CC stickers for a user.
+
+        Only rows with ``codigo_selecao = 'CC'`` and ``quantidade = 0`` are
+        returned, ordered by ``numero`` ascending.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID scoping the query.
+
+        Returns:
+            List of ``codigo_figurinha`` strings.
+        """
+        sql = (
+            "SELECT codigo_figurinha "
+            "FROM figurinhas "
+            "WHERE telegram_user_id = %s AND codigo_selecao = 'CC' AND quantidade = 0 "
+            "ORDER BY numero"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql, (telegram_user_id,))
+            rows = cur.fetchall()
+        result = [str(r[0]) for r in rows]
+        logger.debug("get_cc_faltantes: returned %d entries user=%d", len(result), telegram_user_id)
+        return result
+
+    @staticmethod
+    def _build_progresso(row: tuple) -> Progresso:
+        """Construct a :class:`~models.progresso.Progresso` from an aggregate query row.
+
+        Args:
+            row: Three-element tuple ``(total_album, tipos_possuidos, total_exemplares)``
+                as returned by the ``get_progresso`` SQL query.
+
+        Returns:
+            A frozen :class:`~models.progresso.Progresso` dataclass instance.
+        """
+        total_album, tipos_possuidos, total_exemplares = row
+        return Progresso(
             total_album=int(total_album),
             tipos_possuidos=int(tipos_possuidos),
             total_exemplares=int(total_exemplares),
         )
-        logger.debug(
-            "get_progresso: total=%d possuidos=%d exemplares=%d user=%d",
-            progresso.total_album,
-            progresso.tipos_possuidos,
-            progresso.total_exemplares,
-            telegram_user_id,
-        )
-        return progresso
 
     # ------------------------------------------------------------------
     # Per-user album initialisation
@@ -287,21 +335,19 @@ class FigurinhaRepository(BaseRepository):
         logger.debug("usuario_tem_album: user=%d exists=%s", telegram_user_id, result)
         return result
 
-    def inicializar_album(self, telegram_user_id: int, stickers: list[dict]) -> None:
-        """Batch-insert all sticker rows for a new user with quantidade=0.
+    @staticmethod
+    def _build_album_rows(telegram_user_id: int, stickers: list[dict]) -> list[tuple]:
+        """Build the list of row tuples for batch-inserting album stickers.
 
         Args:
             telegram_user_id: Numeric Telegram user ID owning the new rows.
             stickers: List of dicts with keys: ``grupo``, ``codigo_selecao``,
-                ``nome_selecao``, ``numero``, ``codigo_figurinha``.
+                ``nome_selecao``, ``numero``, ``codigo_figurinha``, ``pagina``.
+
+        Returns:
+            List of tuples matching the ``_SQL_INIT_ALBUM`` placeholder order.
         """
-        sql = (
-            "INSERT INTO figurinhas "
-            "(telegram_user_id, grupo, codigo_selecao, nome_selecao, numero, codigo_figurinha, quantidade) "
-            "VALUES (%s, %s, %s, %s, %s, %s, 0) "
-            "ON CONFLICT (telegram_user_id, codigo_figurinha) DO NOTHING"
-        )
-        rows = [
+        return [
             (
                 telegram_user_id,
                 s["grupo"],
@@ -309,9 +355,33 @@ class FigurinhaRepository(BaseRepository):
                 s["nome_selecao"],
                 s["numero"],
                 s["codigo_figurinha"],
+                s["pagina"],
             )
             for s in stickers
         ]
-        with self._conn.cursor() as cur:
-            cur.executemany(sql, rows)
-        logger.debug("inicializar_album: inserted %d stickers for user=%d", len(rows), telegram_user_id)
+
+    def inicializar_album(self, telegram_user_id: int, stickers: list[dict]) -> None:
+        """Batch-insert all sticker rows for a new user with quantidade=0.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID owning the new rows.
+            stickers: List of dicts with keys: ``grupo``, ``codigo_selecao``,
+                ``nome_selecao``, ``numero``, ``codigo_figurinha``, ``pagina``.
+
+        Raises:
+            psycopg2.DatabaseError: If the database rejects the batch insert.
+                The connection is rolled back before re-raising.
+        """
+        rows = self._build_album_rows(telegram_user_id, stickers)
+        try:
+            with self._conn.cursor() as cur:
+                cur.executemany(_SQL_INIT_ALBUM, rows)
+            logger.debug("inicializar_album: %d stickers for user=%d", len(rows), telegram_user_id)
+        except psycopg2.DatabaseError:
+            self._conn.rollback()
+            logger.exception(
+                "inicializar_album: rollback — user=%d stickers=%d",
+                telegram_user_id,
+                len(rows),
+            )
+            raise

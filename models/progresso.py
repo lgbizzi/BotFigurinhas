@@ -18,11 +18,29 @@ class Progresso:
         total_album: Total number of distinct sticker types in the album.
         tipos_possuidos: Count of sticker types where ``quantidade > 0``.
         total_exemplares: Sum of all ``quantidade`` values across the album.
+        paises_completos: Number of group A–L selections where every sticker
+            has ``quantidade > 0``.
+        top3_proximos: Up to 3 tuples ``(nome_selecao, qtd_faltantes)`` for
+            group A–L selections closest to completion, ordered ascending by
+            missing sticker count.
+        top3_distantes: Up to 3 tuples ``(nome_selecao, qtd_faltantes)`` for
+            group A–L selections farthest from completion, ordered descending
+            by missing sticker count.
+        brilhantes_faltantes: Canonical codes of stickers that are "brilhantes"
+            (numero=1 of any A–L selection, or any FWC sticker) and are still
+            missing (``quantidade = 0``).
+        cc_faltantes: Canonical codes of CC stickers with ``quantidade = 0``,
+            ordered by ``numero``.
     """
 
     total_album: int
     tipos_possuidos: int
     total_exemplares: int
+    paises_completos: int = 0
+    top3_proximos: tuple[tuple[str, int], ...] = ()
+    top3_distantes: tuple[tuple[str, int], ...] = ()
+    brilhantes_faltantes: tuple[str, ...] = ()
+    cc_faltantes: tuple[str, ...] = ()
 
     @property
     def tipos_faltantes(self) -> int:
