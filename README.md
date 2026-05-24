@@ -3,6 +3,8 @@
 Telegram bot para controle do álbum de figurinhas da Copa do Mundo 2026.
 Cada usuário tem seu próprio álbum independente com as **994 figurinhas** oficiais.
 
+> 🤖 **Acesse o bot no Telegram:** [@InformaFigurinhas2026](https://t.me/InformaFigurinhas2026)
+
 ---
 
 ## Funcionalidades
