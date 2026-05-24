@@ -237,6 +237,114 @@ def operacao_cancelada() -> str:
     return "ℹ️ Operação cancelada."
 
 
+def solicitar_codigo_busca() -> str:
+    """Prompt the user to type a sticker code for the /buscar lookup.
+
+    Returns:
+        Instruction message asking for a sticker code.
+    """
+    return (
+        "🔍 Digite o código ou nome da figurinha que deseja buscar.\n"
+        "Exemplos: `BRA-1`, `Brasil 1`, `FWC 0`, `CC-14`\n\n"
+        "Envie /cancelar para cancelar."
+    )
+
+
+def formatar_busca(figurinha: "Figurinha") -> str:
+    """Format the result of a single sticker lookup (/buscar).
+
+    Args:
+        figurinha: The found :class:`~models.figurinha.Figurinha` instance.
+
+    Returns:
+        Formatted message reflecting the user's current stock for that sticker.
+    """
+    codigo = figurinha.codigo_figurinha
+    nome = figurinha.nome_selecao
+    qtd = figurinha.quantidade
+
+    if qtd == 0:
+        return (
+            f"❌ *{codigo}* ({nome})\n"
+            "Você ainda não tem essa figurinha.\n"
+            "Digite /adicionar para registrá-la quando encontrá-la."
+        )
+    if qtd == 1:
+        return (
+            f"✅ Você já possui essa figurinha!\n"
+            f"*{codigo}* ({nome})\n\n"
+            "Se tiver mais figurinhas dessa, digite /adicionar para registrar a quantidade."
+        )
+    return (
+        f"⚠️ Figurinha repetida.\n"
+        f"Você já tem *{qtd}* de *{codigo}* ({nome})."
+    )
+
+
+def solicitar_pais() -> str:
+    """Prompt the user to type a country name for the /buscar_pais lookup.
+
+    Returns:
+        Instruction message asking for a country name.
+    """
+    return (
+        "🔍 Digite o nome do país que deseja buscar.\n"
+        "Exemplos: `Brasil`, `Argentina`, `Alemanha`, `Costa do Marfim`\n\n"
+        "Envie /cancelar para cancelar."
+    )
+
+
+def formatar_busca_pais(
+    nome_selecao: str,
+    codigo_selecao: str,
+    figurinhas: "list[Figurinha]",
+) -> str:
+    """Format the full sticker breakdown for a given country (/buscar_pais).
+
+    Separates the figurinhas into three sections — owned (qty == 1),
+    repeated (qty > 1), and missing (qty == 0).
+
+    Args:
+        nome_selecao: Full country name in Portuguese.
+        codigo_selecao: Short country code, e.g. ``"BRA"``.
+        figurinhas: All figurinhas for the country ordered by ``numero``.
+
+    Returns:
+        Formatted Markdown message with three sticker-status sections.
+    """
+    flag = bandeira(codigo_selecao)
+    prefix = f"{flag} " if flag else ""
+
+    tem = [f for f in figurinhas if f.quantidade == 1]
+    repetidas = [f for f in figurinhas if f.quantidade > 1]
+    faltam = [f for f in figurinhas if f.quantidade == 0]
+
+    linhas: list[str] = [
+        f"*Busca por país*",
+        f"{prefix}*{nome_selecao}*",
+        "",
+        f"✅ *Já tem*",
+    ]
+    if tem:
+        linhas.extend(f.codigo_figurinha for f in tem)
+    else:
+        linhas.append("_(nenhuma)_")
+
+    linhas += ["", "⚠️ *Repetidas*"]
+    if repetidas:
+        linhas.extend(f"{f.codigo_figurinha} (×{f.quantidade})" for f in repetidas)
+    else:
+        linhas.append("_(nenhuma)_")
+
+    linhas += ["", "❌ *Faltam*"]
+    if faltam:
+        linhas.extend(f.codigo_figurinha for f in faltam)
+    else:
+        linhas.append("_(nenhuma — país completo! 🎉)_")
+
+    return "\n".join(linhas)
+
+
 def boas_vindas() -> str:
     """Welcome message sent in response to the /start command.
 
@@ -252,6 +360,8 @@ def boas_vindas() -> str:
         "• /progresso — Ver % de completude do álbum\n"
         "• /faltantes — Ver figurinhas que faltam por país\n"
         "• /repetidas — Ver figurinhas repetidas\n"
+        "• /buscar — Buscar uma figurinha específica\n"
+        "• /buscar\\_pais — Ver todas as figurinhas de um país\n"
         "• /cancelar — Cancelar a operação em andamento"
     )
 

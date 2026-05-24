@@ -167,6 +167,64 @@ class FigurinhaRepository(BaseRepository):
     # Read-only queries
     # ------------------------------------------------------------------
 
+    def find_by_codigo_readonly(
+        self, codigo_figurinha: str, telegram_user_id: int
+    ) -> Optional[Figurinha]:
+        """Fetch a figurinha by canonical code without locking the row.
+
+        For read-only queries only.  Use :meth:`find_by_codigo` when the
+        caller will subsequently call :meth:`update_quantidade`.
+
+        Args:
+            codigo_figurinha: Canonical sticker code, e.g. ``"BRA-1"``.
+            telegram_user_id: Numeric Telegram user ID scoping the query.
+
+        Returns:
+            A :class:`Figurinha` instance if found, ``None`` otherwise.
+        """
+        sql = (
+            f"SELECT {_SELECT_COLS} "
+            "FROM figurinhas "
+            "WHERE codigo_figurinha = %s AND telegram_user_id = %s"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql, (codigo_figurinha, telegram_user_id))
+            row = cur.fetchone()
+
+        if row is None:
+            logger.debug("find_by_codigo_readonly: code=%r user=%d not found", codigo_figurinha, telegram_user_id)
+            return None
+
+        figurinha = Figurinha.from_row(row)
+        logger.debug("find_by_codigo_readonly: found id=%d code=%r", figurinha.id, codigo_figurinha)
+        return figurinha
+
+    def find_by_selecao(
+        self, codigo_selecao: str, telegram_user_id: int
+    ) -> list[Figurinha]:
+        """Return all figurinhas for a given selection, ordered by numero.
+
+        Args:
+            codigo_selecao: Short team/section code, e.g. ``"BRA"``.
+            telegram_user_id: Numeric Telegram user ID scoping the query.
+
+        Returns:
+            List of :class:`Figurinha` instances ordered by ``numero`` ascending.
+        """
+        sql = (
+            f"SELECT {_SELECT_COLS} "
+            "FROM figurinhas "
+            "WHERE codigo_selecao = %s AND telegram_user_id = %s "
+            "ORDER BY numero"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql, (codigo_selecao, telegram_user_id))
+            rows = cur.fetchall()
+
+        figurinhas = [Figurinha.from_row(row) for row in rows]
+        logger.debug("find_by_selecao: selecao=%r returned %d rows user=%d", codigo_selecao, len(figurinhas), telegram_user_id)
+        return figurinhas
+
     def find_faltantes(self, telegram_user_id: int) -> list[Figurinha]:
         """Fetch all figurinhas the user still needs (quantidade = 0).
 

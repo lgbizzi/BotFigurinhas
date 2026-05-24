@@ -95,6 +95,20 @@ class AlbumQueryService:
         logger.debug("repetidas_agrupadas: processing %d repetidas", len(repetidas))
         return self._agrupar(repetidas)
 
+    def buscar_por_selecao(
+        self, codigo_selecao: str, telegram_user_id: int
+    ) -> list[Figurinha]:
+        """Return all figurinhas for a given selection in numero order.
+
+        Args:
+            codigo_selecao: Short team/section code, e.g. ``"BRA"``.
+            telegram_user_id: Numeric Telegram user ID scoping the query.
+
+        Returns:
+            List of :class:`~models.figurinha.Figurinha` ordered by ``numero``.
+        """
+        return self._repo.find_by_selecao(codigo_selecao, telegram_user_id)
+
     def progresso(self, telegram_user_id: int) -> Progresso:
         """Return aggregated album completion statistics.
 

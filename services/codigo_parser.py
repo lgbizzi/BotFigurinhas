@@ -146,6 +146,42 @@ class CodigoParser:
     # API pública
     # ------------------------------------------------------------------
 
+    def resolver_selecao(self, entrada: str) -> str:
+        """Resolve a country name or bare code to its canonical codigo_selecao.
+
+        Accepts the same Portuguese names and accented variants recognised by
+        :meth:`normalizar`, but does **not** require a sticker number.
+
+        Args:
+            entrada: Country name or code, e.g. ``"Brasil"``, ``"BRA"``,
+                ``"Alemanha"``, ``"Costa do Marfim"``.
+
+        Returns:
+            Canonical ``codigo_selecao`` string, e.g. ``"BRA"``.
+
+        Raises:
+            CodigoInvalidoError: If the entry cannot be matched to any known
+                selection in the Copa 2026 album.
+        """
+        texto = self._limpar(entrada)
+        texto = self._normalizar_acentos(texto)
+
+        if texto in _CODIGOS_VALIDOS:
+            return texto
+
+        for nome in _NOMES_COMPOSTOS:
+            if texto == nome:
+                return _NOME_PARA_CODIGO[nome]
+
+        for nome in _NOMES_SIMPLES:
+            if texto == nome:
+                return _NOME_PARA_CODIGO[nome]
+
+        raise CodigoInvalidoError(
+            f"País não reconhecido: {entrada!r}. "
+            "Use o nome em português, ex.: 'Brasil', 'Argentina', 'Alemanha', 'Costa do Marfim'."
+        )
+
     def normalizar(self, entrada: str) -> str:
         """Recebe texto bruto do usuário e retorna o código canônico.
 

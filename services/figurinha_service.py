@@ -310,6 +310,47 @@ class FigurinhaService:
                 falhas.append((entrada, "Erro inesperado"))
         return sucesso, falhas
 
+    def resolver_selecao(self, entrada_bruta: str) -> str:
+        """Resolve a country name or bare code to its canonical codigo_selecao.
+
+        Args:
+            entrada_bruta: Country name or code typed by the user.
+
+        Returns:
+            Canonical ``codigo_selecao`` string, e.g. ``"BRA"``.
+
+        Raises:
+            CodigoInvalidoError: If the entry cannot be matched to any known
+                selection in the Copa 2026 album.
+        """
+        return self._parser.resolver_selecao(entrada_bruta)
+
+    def buscar_para_consulta(self, entrada_bruta: str, telegram_user_id: int) -> Figurinha:
+        """Parse a sticker code and fetch the record without locking the row.
+
+        Intended for read-only lookups (e.g. /buscar).  Uses
+        :meth:`~repositories.figurinha_repository.FigurinhaRepository.find_by_codigo_readonly`
+        so it does not block concurrent write operations on the same row.
+
+        Args:
+            entrada_bruta: Raw text typed by the user (any accepted format).
+            telegram_user_id: Numeric Telegram user ID scoping the lookup.
+
+        Returns:
+            The matching :class:`~models.figurinha.Figurinha` instance.
+
+        Raises:
+            CodigoInvalidoError: If the code cannot be parsed.
+            FigurinhaNaoEncontradaError: If the sticker does not exist for the user.
+        """
+        codigo = self._parser.normalizar(entrada_bruta)
+        figurinha = self._repo.find_by_codigo_readonly(codigo, telegram_user_id)
+        if figurinha is None:
+            raise FigurinhaNaoEncontradaError(
+                f"Figurinha com código {codigo!r} não encontrada."
+            )
+        return figurinha
+
     def buscar_por_entrada(self, entrada_bruta: str, telegram_user_id: int) -> Figurinha:
         """Normaliza o código de entrada e retorna a Figurinha correspondente.
 

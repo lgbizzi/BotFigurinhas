@@ -242,6 +242,54 @@ class BotController:
             logger.exception("processar_adicionar_lote: unexpected error")
             return tmpl.erro_generico()
 
+    def consultar_buscar(
+        self,
+        entrada_bruta: str,
+        telegram_user_id: int,
+        telegram_username: str,
+    ) -> str:
+        """Look up a single sticker and return its stock status message.
+
+        Args:
+            entrada_bruta: Raw sticker code or name typed by the user.
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram @username of the user.
+
+        Returns:
+            Formatted message reflecting quantity owned (0, 1, or >1).
+        """
+        try:
+            self._garantir_album(telegram_user_id, telegram_username)
+            figurinha = self._service.buscar_para_consulta(entrada_bruta, telegram_user_id)
+            return tmpl.formatar_busca(figurinha)
+        except Exception as exc:
+            return self._tratar_excecao_dominio("consultar_buscar", entrada_bruta, exc)
+
+    def consultar_buscar_pais(
+        self,
+        entrada_pais: str,
+        telegram_user_id: int,
+        telegram_username: str,
+    ) -> str:
+        """Return a full sticker breakdown for a given country.
+
+        Args:
+            entrada_pais: Country name or code typed by the user.
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram @username of the user.
+
+        Returns:
+            Formatted message listing owned, repeated, and missing stickers.
+        """
+        try:
+            self._garantir_album(telegram_user_id, telegram_username)
+            codigo_selecao = self._service.resolver_selecao(entrada_pais)
+            figurinhas = self._query_service.buscar_por_selecao(codigo_selecao, telegram_user_id)
+            nome = figurinhas[0].nome_selecao if figurinhas else entrada_pais
+            return tmpl.formatar_busca_pais(nome, codigo_selecao, figurinhas)
+        except Exception as exc:
+            return self._tratar_excecao_dominio("consultar_buscar_pais", entrada_pais, exc)
+
     def consultar_progresso(self, telegram_user_id: int, telegram_username: str) -> str:
         """Return a formatted album completion progress message.
 
