@@ -315,7 +315,7 @@ def formatar_busca_pais(
     flag = bandeira(codigo_selecao)
     prefix = f"{flag} " if flag else ""
 
-    tem = [f for f in figurinhas if f.quantidade == 1]
+    tem = [f for f in figurinhas if f.quantidade >= 1]
     repetidas = [f for f in figurinhas if f.quantidade > 1]
     faltam = [f for f in figurinhas if f.quantidade == 0]
 
@@ -332,7 +332,7 @@ def formatar_busca_pais(
 
     linhas += ["", "⚠️ *Repetidas*"]
     if repetidas:
-        linhas.extend(f"{f.codigo_figurinha} (×{f.quantidade})" for f in repetidas)
+        linhas.extend(f"{f.codigo_figurinha} (×{f.quantidade - 1})" for f in repetidas)
     else:
         linhas.append("_(nenhuma)_")
 
