@@ -233,6 +233,23 @@
 | 11.6 | Adicionar `consultar_buscar` e `consultar_buscar_pais` ao `controllers/bot_controller.py` | ✅ Concluído | |
 | 11.7 | Criar `bot/handlers/buscar_handler.py` — `ConversationHandler` para `/buscar` e `/buscar_pais` (fluxo de 1 passo cada) | ✅ Concluído | |
 | 11.8 | Atualizar `bot/bot_setup.py` — registrar `build_buscar_handlers` | ✅ Concluído | |
+| 11.9 | Corrigir `views/message_templates.py` — `formatar_busca_pais`: figurinhas com `quantidade >= 1` aparecem em "Já tem"; repetidas exibem `quantidade - 1` na seção "Repetidas" | ✅ Concluído | Ajuste solicitado pelo usuário após deploy |
+
+---
+
+### Etapa 12 — Comandos de Privacidade: `/consulta` e `/excluir_usuario`
+> Agente responsável: **Bot Interface Dev** | Data: 2026-05-24
+
+| # | Tarefa | Status | Observações |
+|---|---|---|---|
+| 12.1 | Adicionar `get_dados_usuario` ao `repositories/figurinha_repository.py` — aggregate query com totais de figurinhas e movimentações | ✅ Concluído | |
+| 12.2 | Adicionar `excluir_usuario` ao `repositories/figurinha_repository.py` — DELETE em ordem FK-safe (movimentacoes → figurinhas); sem commit (responsabilidade do caller) | ✅ Concluído | |
+| 12.3 | Adicionar `consultar_dados_usuario` e `excluir_usuario` ao `services/figurinha_service.py` — `excluir_usuario` faz commit e rollback em caso de erro | ✅ Concluído | |
+| 12.4 | Adicionar templates ao `views/message_templates.py` — `formatar_dados_usuario`, `confirmacao_exclusao`, `confirmar_exclusao_realizada`, `cancelar_exclusao`; atualizar `boas_vindas` | ✅ Concluído | |
+| 12.5 | Adicionar `consultar_dados_usuario` e `excluir_usuario` ao `controllers/bot_controller.py` | ✅ Concluído | |
+| 12.6 | Criar `bot/handlers/privacidade_handler.py` — `CommandHandler` simples para `/consulta`; `ConversationHandler` com teclado Sim/Não para `/excluir_usuario` | ✅ Concluído | Teclado customizado via `ReplyKeyboardMarkup`; removido após resposta via `ReplyKeyboardRemove` |
+| 12.7 | Atualizar `bot/bot_setup.py` — registrar `build_privacidade_handlers` | ✅ Concluído | |
+| 12.8 | Atualizar `README.md` — adicionar `/consulta` e `/excluir_usuario` à tabela de comandos | ✅ Concluído | |
 
 ---
 
@@ -275,6 +292,10 @@
 | 2026-05-24 | `/buscar` e `/buscar_pais` implementados como `ConversationHandler` de 1 passo | Consistência com o padrão existente de `/adicionar` e `/remover`; isola o estado de espera de entrada | Business Analyst (solicitação do usuário) |
 | 2026-05-24 | `find_by_codigo_readonly` usa `SELECT` sem `FOR UPDATE` para o `/buscar` | Consultas de leitura não devem bloquear linhas; `FOR UPDATE` reservado para operações de escrita | Business Analyst |
 | 2026-05-24 | `resolver_selecao` no parser aceita código direto (`BRA`) ou nome em português (`Brasil`, `Costa do Marfim`) sem exigir número | Permite que o usuário informe somente o país no `/buscar_pais`, reutilizando o dicionário de aliases já existente | Business Analyst |
+| 2026-05-24 | `/buscar_pais`: figurinhas com `quantidade >= 1` aparecem em "Já tem"; repetidas aparecem também em "Repetidas" com `quantidade - 1` | Uma figurinha é "possuída" mesmo que haja repetidas; o excedente representa o estoque disponível para troca | Business Analyst (ajuste solicitado pelo usuário) |
+| 2026-05-24 | `/excluir_usuario` usa `ReplyKeyboardMarkup` com botões Sim/Não | Reduz chance de erro de digitação em operação irreversível; teclado é removido após a resposta via `ReplyKeyboardRemove` | Business Analyst |
+| 2026-05-24 | DELETE em ordem FK-safe: `movimentacoes` antes de `figurinhas` | `movimentacoes.figurinha_id` tem `ON DELETE RESTRICT`; inverter a ordem causaria erro de FK | Business Analyst |
+| 2026-05-24 | Criar `docs/PRIVACY_POLICY.md` com política de privacidade mínima | Documentar os dados coletados (Telegram ID e username) e direitos do usuário (consulta e exclusão), em conformidade com boas práticas de privacidade | Business Analyst (solicitação do usuário) |
 
 ---
 

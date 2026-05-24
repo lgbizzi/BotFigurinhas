@@ -18,6 +18,8 @@ Cada usuário tem seu próprio álbum independente com as **994 figurinhas** ofi
 | `/repetidas` | Lista figurinhas repetidas agrupadas por grupo de álbum (uma mensagem por grupo) |
 | `/buscar` | Consulta o status de uma figurinha específica pelo código (fluxo conversacional) |
 | `/buscar_pais` | Exibe o detalhamento completo de uma seleção: figurinhas que tem, repetidas (excedente para troca) e faltantes |
+| `/consulta` | Exibe os dados armazenados sobre o usuário (Telegram ID, estatísticas do álbum e histórico de movimentações) |
+| `/excluir_usuario` | Remove permanentemente todos os dados do usuário do banco de dados (fluxo conversacional com confirmação Sim/Não) |
 | `/cancelar` | Cancela a operação em andamento |
 
 ### Formatos aceitos para códigos
