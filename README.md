@@ -125,11 +125,12 @@ Abra o `.env` e preencha **todos** os campos marcados com `<CHANGE_ME>`:
 | Variável | O que preencher |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Token obtido com o [@BotFather](https://t.me/BotFather) |
-| `POSTGRES_PASSWORD` | Senha para o usuário de aplicação do banco |
-| `POSTGRES_ADMIN_PASSWORD` | Senha para o superusuário interno do container |
-
-Os demais campos já possuem valores sugeridos (`POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_SCHEMA`, etc.) e podem ser mantidos ou ajustados conforme sua preferência.
+| `POSTGRES_DB` | Nome do banco de dados |
+| `POSTGRES_USER` | Usuário de aplicação (role no PostgreSQL) |
+| `POSTGRES_PASSWORD` | Senha do usuário de aplicação |
+| `POSTGRES_SCHEMA` | Nome do schema onde as tabelas serão criadas |
+| `POSTGRES_ADMIN_USER` | Superusuário interno do container PostgreSQL |
+| `POSTGRES_ADMIN_PASSWORD` | Senha do superusuário do container |
 
 > ⚠️ `POSTGRES_HOST` deve permanecer `db` ao rodar via Docker Compose — é o nome
 > interno do serviço de banco de dados na rede do container.
@@ -286,18 +287,18 @@ tests/
 
 ## Variáveis de ambiente
 
-| Variável | Obrigatória | Sugestão de valor | Descrição |
-|---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Sim | — | Token do bot (obtido com o @BotFather) |
-| `POSTGRES_HOST` | Sim | `db` | Host do banco (`db` em Docker, `localhost` sem Docker) |
-| `POSTGRES_PORT` | Não | `5432` | Porta PostgreSQL |
-| `POSTGRES_DB` | Sim | `homelab` | Nome do banco de dados |
-| `POSTGRES_USER` | Sim | `lg.admin` | Usuário de aplicação (role no PostgreSQL) |
-| `POSTGRES_PASSWORD` | Sim | — | Senha do usuário de aplicação |
-| `POSTGRES_SCHEMA` | Sim | `AlbumCopa2026` | Schema onde as tabelas são criadas |
-| `POSTGRES_ADMIN_USER` | Sim¹ | `postgres` | Superusuário interno do container |
-| `POSTGRES_ADMIN_PASSWORD` | Sim¹ | — | Senha do superusuário do container |
-| `DB_POOL_MIN` | Não | `1` | Conexões mínimas no pool |
-| `DB_POOL_MAX` | Não | `10` | Conexões máximas no pool |
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Sim | Token do bot (obtido com o @BotFather) |
+| `POSTGRES_HOST` | Sim | Host do banco (`db` em Docker, `localhost` sem Docker) |
+| `POSTGRES_PORT` | Não | Porta PostgreSQL (padrão: `5432`) |
+| `POSTGRES_DB` | Sim | Nome do banco de dados |
+| `POSTGRES_USER` | Sim | Usuário de aplicação (role no PostgreSQL) |
+| `POSTGRES_PASSWORD` | Sim | Senha do usuário de aplicação |
+| `POSTGRES_SCHEMA` | Sim | Schema onde as tabelas são criadas |
+| `POSTGRES_ADMIN_USER` | Sim¹ | Superusuário interno do container PostgreSQL |
+| `POSTGRES_ADMIN_PASSWORD` | Sim¹ | Senha do superusuário do container |
+| `DB_POOL_MIN` | Não | Conexões mínimas no pool (padrão: `1`) |
+| `DB_POOL_MAX` | Não | Conexões máximas no pool (padrão: `10`) |
 
 ¹ Necessário apenas para o deploy com Docker. Não é usado pelo bot em execução.
