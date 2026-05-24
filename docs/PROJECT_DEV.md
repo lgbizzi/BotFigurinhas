@@ -6,6 +6,10 @@
 
 ## Status Geral
 
+✅ **Etapa 11 concluída** — 2026-05-24. Comandos `/buscar` e `/buscar_pais` implementados com fluxo conversacional, templates e registro no bot.
+
+✅ **Etapa 10 concluída** — 2026-05-23/24. Deploy em container Docker (PostgreSQL + bot), credenciais via `.env`, script de inicialização sem valores chumbados, documentação de deploy, scripts SQL de migração de dados.
+
 ✅ **Etapa 9 concluída** — 2026-05-23. Melhorias no `/progresso` (novos dados analíticos) e nos cabeçalhos de `/faltantes` e `/repetidas` implementadas e aprovadas em QA.
 
 ---
@@ -198,6 +202,40 @@
 
 ---
 
+### Etapa 10 — Deploy com Docker e Documentação de Infraestrutura
+> Agente responsável: **Data Engineer** + **Business Analyst** | Data: 2026-05-23/24
+
+| # | Tarefa | Status | Observações |
+|---|---|---|---|
+| 10.1 | Criar `database/homelab_init/00_setup.sh` — script de inicialização do PostgreSQL (cria role, schema, aplica migrations, concede permissões) | ✅ Concluído | Inicialmente com credenciais chumbadas; corrigido na tarefa 10.3 |
+| 10.2 | Atualizar `docker-compose.yml` — separar superusuário Docker (`POSTGRES_ADMIN_USER`) do usuário de aplicação (`POSTGRES_USER`); repassar `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD`, `POSTGRES_SCHEMA` ao container db | ✅ Concluído | |
+| 10.3 | Corrigir `database/homelab_init/00_setup.sh` — substituir credenciais chumbadas por variáveis de ambiente; adicionar guard clauses `: "${VAR:?}"` | ✅ Concluído | Identificado pelo usuário; `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD`, `POSTGRES_SCHEMA` via env |
+| 10.4 | Atualizar `config/settings.py` — adicionar `DB_SCHEMA` lido de `POSTGRES_SCHEMA` | ✅ Concluído | |
+| 10.5 | Atualizar `database/connection.py` — adicionar `options=f'-c search_path="{settings.DB_SCHEMA}"'` ao pool | ✅ Concluído | Garante isolamento de schema em todas as conexões |
+| 10.6 | Atualizar `.env.example` — separar campos obrigatórios (`<CHANGE_ME>`) dos com sugestão; adicionar `POSTGRES_ADMIN_USER/PASSWORD`; adicionar seção `SRC_POSTGRES_*` para migração | ✅ Concluído | |
+| 10.7 | Criar `docs/DEPLOY.md` — guia completo de deploy: pré-requisitos, passo a passo, fluxo de credenciais, manutenção, backup, variáveis | ✅ Concluído | |
+| 10.8 | Atualizar `README.md` — nova seção de deploy sem credenciais chumbadas; diagrama de fluxo de credenciais; tabela `<CHANGE_ME>` vs sugestão; seção "Execução sem Docker"; tabela de variáveis com coluna "Sugestão de valor" | ✅ Concluído | |
+| 10.9 | Criar `database/migrate_from_informapromo.sh` — script bash para migração de dados (pg_dump → sed schema → psql import → SELECT validação) usando `SRC_POSTGRES_*` e `POSTGRES_*` do `.env` | ✅ Concluído | |
+| 10.10 | Criar scripts SQL em `database/sql/` — `01_figurinhas_extract.sql` (inspeção origem), `02_figurinhas_generate_inserts.sql` (gera INSERTs idempotentes), `03_figurinhas_validate.sql` (valida destino) | ✅ Concluído | |
+
+---
+
+### Etapa 11 — Novos Comandos: `/buscar` e `/buscar_pais`
+> Agente responsável: **Bot Interface Dev** | Data: 2026-05-24
+
+| # | Tarefa | Status | Observações |
+|---|---|---|---|
+| 11.1 | Adicionar `find_by_codigo_readonly` e `find_by_selecao` ao `repositories/figurinha_repository.py` — consultas sem `FOR UPDATE` para uso em leituras | ✅ Concluído | |
+| 11.2 | Adicionar `resolver_selecao` ao `services/codigo_parser.py` — resolve nome de país/código em `codigo_selecao` sem exigir número de figurinha | ✅ Concluído | Reutiliza `_NOME_PARA_CODIGO`, `_NOMES_COMPOSTOS`, `_NOMES_SIMPLES` existentes |
+| 11.3 | Adicionar `resolver_selecao` e `buscar_para_consulta` ao `services/figurinha_service.py` — leitura somente (sem lock) | ✅ Concluído | |
+| 11.4 | Adicionar `buscar_por_selecao` ao `services/album_query_service.py` — retorna todas as figurinhas de uma seleção por `numero` | ✅ Concluído | |
+| 11.5 | Adicionar templates ao `views/message_templates.py` — `solicitar_codigo_busca`, `formatar_busca` (3 cenários: 0, 1, >1), `solicitar_pais`, `formatar_busca_pais` (3 seções: ✅ Já tem / ⚠️ Repetidas / ❌ Faltam); atualizar `boas_vindas` | ✅ Concluído | |
+| 11.6 | Adicionar `consultar_buscar` e `consultar_buscar_pais` ao `controllers/bot_controller.py` | ✅ Concluído | |
+| 11.7 | Criar `bot/handlers/buscar_handler.py` — `ConversationHandler` para `/buscar` e `/buscar_pais` (fluxo de 1 passo cada) | ✅ Concluído | |
+| 11.8 | Atualizar `bot/bot_setup.py` — registrar `build_buscar_handlers` | ✅ Concluído | |
+
+---
+
 ## Legenda de Status
 
 | Ícone | Significado |
@@ -231,6 +269,12 @@
 | 2026-05-23 | `get_paises_completos` removido do repositório; `_paises_completos` calculado no serviço a partir de `get_selecoes_faltantes_contagem` (seleções com `faltantes == 0`) | Lógica de domínio não deve residir em SQL (HAVING no repositório); cálculo no serviço é mais testável | Business Analyst |
 | 2026-05-23 | `_flush_grupo` extraído de `_agrupar` em `album_query_service.py` | Respeitar limite de 20 linhas executáveis por método | Business Analyst |
 | 2026-05-23 | `_formatar_top3` extraído em `message_templates.py` | Respeitar limite de 20 linhas executáveis por método | Business Analyst |
+| 2026-05-23 | Separação de superusuário Docker (`POSTGRES_ADMIN_USER=postgres`) do usuário de aplicação (`POSTGRES_USER=lg.admin`) no `docker-compose.yml` | Docker exige que `POSTGRES_USER` seja o superusuário do container; o usuário de aplicação é criado pelo script de init | Business Analyst (identificado pelo usuário) |
+| 2026-05-23 | `00_setup.sh` usa variáveis de ambiente (`$POSTGRES_APP_USER`, `$POSTGRES_APP_PASSWORD`, `$POSTGRES_SCHEMA`) em vez de valores chumbados | Credenciais nunca devem ser commitadas no código; `.env` é a fonte única | Business Analyst (correção solicitada pelo usuário) |
+| 2026-05-23 | `search_path` definido via `options=f'-c search_path="{settings.DB_SCHEMA}"'` no pool de conexões | Garante que todo SQL executado via psycopg2 use o schema correto sem prefixo explícito nas queries | Business Analyst |
+| 2026-05-24 | `/buscar` e `/buscar_pais` implementados como `ConversationHandler` de 1 passo | Consistência com o padrão existente de `/adicionar` e `/remover`; isola o estado de espera de entrada | Business Analyst (solicitação do usuário) |
+| 2026-05-24 | `find_by_codigo_readonly` usa `SELECT` sem `FOR UPDATE` para o `/buscar` | Consultas de leitura não devem bloquear linhas; `FOR UPDATE` reservado para operações de escrita | Business Analyst |
+| 2026-05-24 | `resolver_selecao` no parser aceita código direto (`BRA`) ou nome em português (`Brasil`, `Costa do Marfim`) sem exigir número | Permite que o usuário informe somente o país no `/buscar_pais`, reutilizando o dicionário de aliases já existente | Business Analyst |
 
 ---
 
