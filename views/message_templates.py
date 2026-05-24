@@ -237,6 +237,69 @@ def operacao_cancelada() -> str:
     return "ℹ️ Operação cancelada."
 
 
+def formatar_dados_usuario(dados: dict) -> str:
+    """Format the user data summary for /consulta.
+
+    Args:
+        dados: Dict returned by ``FigurinhaService.consultar_dados_usuario``.
+
+    Returns:
+        Formatted Markdown message with user data summary.
+    """
+    primeira = dados["primeira_movimentacao"]
+    ultima = dados["ultima_movimentacao"]
+    primeira_txt = primeira.strftime("%d/%m/%Y") if primeira else "—"
+    ultima_txt = ultima.strftime("%d/%m/%Y") if ultima else "—"
+
+    return (
+        "🔐 *Seus dados armazenados*\n\n"
+        f"• *Telegram ID:* `{dados['telegram_user_id']}`\n"
+        f"• *Figurinhas no álbum:* {dados['total_figurinhas']}\n"
+        f"• *Figurinhas possuídas:* {dados['possuidas']}\n"
+        f"• *Total de exemplares:* {dados['total_exemplares']}\n"
+        f"• *Movimentações registradas:* {dados['total_movimentacoes']}\n"
+        f"• *Primeira movimentação:* {primeira_txt}\n"
+        f"• *Última movimentação:* {ultima_txt}\n\n"
+        "Para solicitar a exclusão dos seus dados, use /excluir\\_usuario."
+    )
+
+
+def confirmacao_exclusao() -> str:
+    """Confirmation prompt shown before deleting a user's data.
+
+    Returns:
+        Warning message asking the user to confirm deletion.
+    """
+    return (
+        "⚠️ *ATENÇÃO!!*\n\n"
+        "Os seus dados serão excluídos de forma *PERMANENTE, DEFINITIVA e IRRECUPERÁVEL.*\n\n"
+        "Deseja realmente prosseguir?\n\n"
+        "Digite *Sim* para confirmar ou *Não* para cancelar."
+    )
+
+
+def confirmar_exclusao_realizada() -> str:
+    """Confirmation message shown after successful user data deletion.
+
+    Returns:
+        Success message informing the user their data was deleted.
+    """
+    return (
+        "✅ Seus dados foram excluídos com sucesso.\n"
+        "Seu álbum e histórico de movimentações foram removidos permanentemente.\n\n"
+        "Se quiser usar o bot novamente, basta enviar /start."
+    )
+
+
+def cancelar_exclusao() -> str:
+    """Message shown when the user cancels the deletion flow.
+
+    Returns:
+        Cancellation confirmation message for the deletion flow.
+    """
+    return "ℹ️ Exclusão cancelada. Seus dados foram mantidos."
+
+
 def solicitar_codigo_busca() -> str:
     """Prompt the user to type a sticker code for the /buscar lookup.
 
@@ -362,6 +425,8 @@ def boas_vindas() -> str:
         "• /repetidas — Ver figurinhas repetidas\n"
         "• /buscar — Buscar uma figurinha específica\n"
         "• /buscar\\_pais — Ver todas as figurinhas de um país\n"
+        "• /consulta — Ver seus dados armazenados\n"
+        "• /excluir\\_usuario — Excluir todos os seus dados\n"
         "• /cancelar — Cancelar a operação em andamento"
     )
 

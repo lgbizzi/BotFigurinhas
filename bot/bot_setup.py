@@ -13,6 +13,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 from bot.handlers.adicionar_handler import build_adicionar_handler
 from bot.handlers.buscar_handler import build_buscar_handlers
+from bot.handlers.privacidade_handler import build_privacidade_handlers
 from bot.handlers.consultas_handler import build_consultas_handlers
 from bot.handlers.lote_handler import build_lote_handler
 from bot.handlers.remover_handler import build_remover_handler
@@ -71,6 +72,8 @@ def setup_bot(application: Application, bot_controller: BotController) -> None:
     for handler in build_consultas_handlers(bot_controller):
         application.add_handler(handler)
     for handler in build_buscar_handlers(bot_controller):
+        application.add_handler(handler)
+    for handler in build_privacidade_handlers(bot_controller):
         application.add_handler(handler)
     application.add_error_handler(_error_handler)
 

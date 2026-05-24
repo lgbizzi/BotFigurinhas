@@ -372,6 +372,78 @@ class FigurinhaRepository(BaseRepository):
             total_exemplares=int(total_exemplares),
         )
 
+    def get_dados_usuario(self, telegram_user_id: int) -> dict:
+        """Return a summary of data stored for the given user.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+
+        Returns:
+            Dict with keys ``total_figurinhas``, ``possuidas``,
+            ``total_exemplares``, ``total_movimentacoes``,
+            ``primeira_movimentacao``, ``ultima_movimentacao``.
+        """
+        sql_fig = (
+            "SELECT COUNT(*), "
+            "COUNT(*) FILTER (WHERE quantidade > 0), "
+            "COALESCE(SUM(quantidade), 0) "
+            "FROM figurinhas WHERE telegram_user_id = %s"
+        )
+        sql_mov = (
+            "SELECT COUNT(*), MIN(created_at), MAX(created_at) "
+            "FROM movimentacoes WHERE telegram_user_id = %s"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql_fig, (telegram_user_id,))
+            row_fig = cur.fetchone()
+            cur.execute(sql_mov, (telegram_user_id,))
+            row_mov = cur.fetchone()
+
+        return {
+            "telegram_user_id": telegram_user_id,
+            "total_figurinhas": int(row_fig[0]) if row_fig else 0,
+            "possuidas": int(row_fig[1]) if row_fig else 0,
+            "total_exemplares": int(row_fig[2]) if row_fig else 0,
+            "total_movimentacoes": int(row_mov[0]) if row_mov else 0,
+            "primeira_movimentacao": row_mov[1] if row_mov else None,
+            "ultima_movimentacao": row_mov[2] if row_mov else None,
+        }
+
+    def excluir_usuario(self, telegram_user_id: int) -> tuple[int, int]:
+        """Delete all data for the given user (movimentacoes then figurinhas).
+
+        Deletes in FK-safe order: movimentacoes first, then figurinhas.
+        Does not commit — the caller is responsible for committing.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+
+        Returns:
+            Tuple ``(movimentacoes_deleted, figurinhas_deleted)``.
+
+        Raises:
+            psycopg2.DatabaseError: On any database error; connection is
+                rolled back before re-raising.
+        """
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM movimentacoes WHERE telegram_user_id = %s",
+                    (telegram_user_id,),
+                )
+                mov_del = cur.rowcount
+                cur.execute(
+                    "DELETE FROM figurinhas WHERE telegram_user_id = %s",
+                    (telegram_user_id,),
+                )
+                fig_del = cur.rowcount
+            logger.info("excluir_usuario: user=%d mov_del=%d fig_del=%d", telegram_user_id, mov_del, fig_del)
+            return mov_del, fig_del
+        except psycopg2.DatabaseError:
+            self._conn.rollback()
+            logger.exception("excluir_usuario: rollback — user=%d", telegram_user_id)
+            raise
+
     # ------------------------------------------------------------------
     # Per-user album initialisation
     # ------------------------------------------------------------------

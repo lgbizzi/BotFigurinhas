@@ -310,6 +310,34 @@ class FigurinhaService:
                 falhas.append((entrada, "Erro inesperado"))
         return sucesso, falhas
 
+    def consultar_dados_usuario(self, telegram_user_id: int) -> dict:
+        """Return a summary of data stored for the given user.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+
+        Returns:
+            Dict with user data summary from the repository.
+        """
+        return self._repo.get_dados_usuario(telegram_user_id)
+
+    def excluir_usuario(self, telegram_user_id: int) -> tuple[int, int]:
+        """Delete all data for the given user and commit the transaction.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+
+        Returns:
+            Tuple ``(movimentacoes_deleted, figurinhas_deleted)``.
+        """
+        try:
+            resultado = self._repo.excluir_usuario(telegram_user_id)
+            self._repo.commit()
+            return resultado
+        except Exception:
+            self._repo.rollback()
+            raise
+
     def resolver_selecao(self, entrada_bruta: str) -> str:
         """Resolve a country name or bare code to its canonical codigo_selecao.
 

@@ -242,6 +242,41 @@ class BotController:
             logger.exception("processar_adicionar_lote: unexpected error")
             return tmpl.erro_generico()
 
+    def consultar_dados_usuario(self, telegram_user_id: int, telegram_username: str) -> str:
+        """Return a formatted message with data stored for the user.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram @username of the user.
+
+        Returns:
+            Formatted message with the user's data summary.
+        """
+        try:
+            dados = self._service.consultar_dados_usuario(telegram_user_id)
+            return tmpl.formatar_dados_usuario(dados)
+        except Exception:
+            logger.exception("consultar_dados_usuario: unexpected error user=%d", telegram_user_id)
+            return tmpl.erro_generico()
+
+    def excluir_usuario(self, telegram_user_id: int, telegram_username: str) -> str:
+        """Delete all data for the user and return a confirmation message.
+
+        Args:
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram @username of the user.
+
+        Returns:
+            Formatted success or error message.
+        """
+        try:
+            self._service.excluir_usuario(telegram_user_id)
+            logger.info("excluir_usuario: user=%d username=%r deleted", telegram_user_id, telegram_username)
+            return tmpl.confirmar_exclusao_realizada()
+        except Exception:
+            logger.exception("excluir_usuario: unexpected error user=%d", telegram_user_id)
+            return tmpl.erro_generico()
+
     def consultar_buscar(
         self,
         entrada_bruta: str,
