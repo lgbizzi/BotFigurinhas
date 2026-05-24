@@ -2,7 +2,7 @@
 
 > Arquivo de controle do projeto. Mantido e atualizado exclusivamente pelo **Business Analyst**.
 
-> 🤖 **Bot em produção:** [@InformaFigurinhas2026](https://t.me/InformaFigurinhas2026)
+> 🤖 **Bot em produção:** [@InformaFigurinhasBot](https://t.me/InformaFigurinhasBot)
 
 ---
 

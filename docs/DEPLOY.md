@@ -20,7 +20,7 @@ Guia completo para colocar o bot em produção usando Docker Compose.
 ```
 
 - **bot** — container Python que executa o Telegram bot (`main.py`)
-- **db** — container PostgreSQL 16 com banco `homelab`, schema `AlbumCopa2026`
+- **db** — container PostgreSQL 16 com banco e schema definidos no `.env`
 - **pgdata** — volume Docker que persiste os dados do banco entre reinicializações
 
 ---
@@ -56,20 +56,20 @@ Edite `.env` com as suas credenciais:
 
 ```dotenv
 # Telegram — obtenha o token com o @BotFather
-TELEGRAM_BOT_TOKEN=<token>
+TELEGRAM_BOT_TOKEN=<CHANGE_ME>
 
 # Banco de dados — credenciais de aplicação (usadas pelo bot)
 POSTGRES_HOST=db
 POSTGRES_PORT=5432
-POSTGRES_DB=homelab
-POSTGRES_USER=lg.admin
-POSTGRES_PASSWORD=<senha-forte>
-POSTGRES_SCHEMA=AlbumCopa2026
+POSTGRES_DB=<CHANGE_ME>
+POSTGRES_USER=<CHANGE_ME>
+POSTGRES_PASSWORD=<CHANGE_ME>
+POSTGRES_SCHEMA=<CHANGE_ME>
 
 # Banco de dados — superusuário interno do container
 # Usado apenas na inicialização; nunca altere após o volume pgdata existir
-POSTGRES_ADMIN_USER=postgres
-POSTGRES_ADMIN_PASSWORD=<senha-forte>
+POSTGRES_ADMIN_USER=<CHANGE_ME>
+POSTGRES_ADMIN_PASSWORD=<CHANGE_ME>
 
 # Pool de conexões
 DB_POOL_MIN=1
@@ -86,8 +86,8 @@ DB_POOL_MAX=10
 Na **primeira execução**, o PostgreSQL inicializa o banco e roda automaticamente
 o script `database/homelab_init/00_setup.sh`, que:
 
-1. Cria o role de aplicação `"lg.admin"` com a senha configurada
-2. Cria o schema `"AlbumCopa2026"` e transfere a propriedade para `"lg.admin"`
+1. Cria o role de aplicação definido em `POSTGRES_USER` com a senha configurada
+2. Cria o schema definido em `POSTGRES_SCHEMA` e transfere a propriedade para o role
 3. Aplica as migrations 001–004 em sequência dentro do schema
 4. Concede todas as permissões necessárias ao role de aplicação
 
@@ -148,11 +148,11 @@ brew install libpq
 O script lê as variáveis com prefixo `SRC_` do arquivo `.env`:
 
 ```dotenv
-SRC_POSTGRES_HOST=<host-do-informapromo>
+SRC_POSTGRES_HOST=<CHANGE_ME>
 SRC_POSTGRES_PORT=5432
-SRC_POSTGRES_DB=informapromo
-SRC_POSTGRES_USER=informapromo
-SRC_POSTGRES_PASSWORD=<senha>
+SRC_POSTGRES_DB=<CHANGE_ME>
+SRC_POSTGRES_USER=<CHANGE_ME>
+SRC_POSTGRES_PASSWORD=<CHANGE_ME>
 ```
 
 ### 4.3 Executar o script
@@ -207,17 +207,17 @@ docker compose logs -f db
 ### Acessar o banco diretamente
 
 ```bash
-docker compose exec db psql -U postgres -d homelab \
-  -c "SET search_path TO \"AlbumCopa2026\";"
+docker compose exec db psql -U <POSTGRES_ADMIN_USER> -d <POSTGRES_DB> \
+  -c "SET search_path TO \"<POSTGRES_SCHEMA>\";"
 ```
 
 ### Backup do banco
 
 ```bash
 docker compose exec db pg_dump \
-  -U postgres \
-  -d homelab \
-  -n '"AlbumCopa2026"' \
+  -U <POSTGRES_ADMIN_USER> \
+  -d <POSTGRES_DB> \
+  -n '"<POSTGRES_SCHEMA>"' \
   --no-owner \
   -f /tmp/backup_$(date +%Y%m%d).sql
 
@@ -267,11 +267,11 @@ projects/BotFigurinhas/
 | `TELEGRAM_BOT_TOKEN` | Sim | Token do bot (obtido com o @BotFather) |
 | `POSTGRES_HOST` | Sim | Host do banco (`db` em produção Docker) |
 | `POSTGRES_PORT` | Não | Porta PostgreSQL (padrão: `5432`) |
-| `POSTGRES_DB` | Sim | Nome do banco (`homelab`) |
-| `POSTGRES_USER` | Sim | Usuário de aplicação (`lg.admin`) |
+| `POSTGRES_DB` | Sim | Nome do banco de dados |
+| `POSTGRES_USER` | Sim | Usuário de aplicação (role no PostgreSQL) |
 | `POSTGRES_PASSWORD` | Sim | Senha do usuário de aplicação |
-| `POSTGRES_SCHEMA` | Sim | Schema do projeto (`AlbumCopa2026`) |
-| `POSTGRES_ADMIN_USER` | Sim | Superusuário do container (`postgres`) |
+| `POSTGRES_SCHEMA` | Sim | Schema onde as tabelas são criadas |
+| `POSTGRES_ADMIN_USER` | Sim | Superusuário interno do container PostgreSQL |
 | `POSTGRES_ADMIN_PASSWORD` | Sim | Senha do superusuário do container |
 | `DB_POOL_MIN` | Não | Conexões mínimas no pool (padrão: `1`) |
 | `DB_POOL_MAX` | Não | Conexões máximas no pool (padrão: `10`) |

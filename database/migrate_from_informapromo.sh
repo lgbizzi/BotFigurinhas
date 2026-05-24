@@ -22,23 +22,36 @@ if [ -f "$(dirname "$0")/../.env" ]; then
     export $(grep -v '^#' "$(dirname "$0")/../.env" | xargs)
 fi
 
-# --- Origem: informapromo ---
-SRC_HOST="${SRC_POSTGRES_HOST:-localhost}"
-SRC_PORT="${SRC_POSTGRES_PORT:-5432}"
-SRC_DB="${SRC_POSTGRES_DB:-informapromo}"
-SRC_USER="${SRC_POSTGRES_USER:-informapromo}"
-SRC_PASS="${SRC_POSTGRES_PASSWORD}"
-SRC_SCHEMA="public"   # schema de origem no banco informapromo
+# --- Origem ---
+: "${SRC_POSTGRES_HOST:?Variável SRC_POSTGRES_HOST não definida}"
+: "${SRC_POSTGRES_DB:?Variável SRC_POSTGRES_DB não definida}"
+: "${SRC_POSTGRES_USER:?Variável SRC_POSTGRES_USER não definida}"
+: "${SRC_POSTGRES_PASSWORD:?Variável SRC_POSTGRES_PASSWORD não definida}"
 
-# --- Destino: homelab ---
-DST_HOST="${POSTGRES_HOST:-localhost}"
+SRC_HOST="${SRC_POSTGRES_HOST}"
+SRC_PORT="${SRC_POSTGRES_PORT:-5432}"
+SRC_DB="${SRC_POSTGRES_DB}"
+SRC_USER="${SRC_POSTGRES_USER}"
+SRC_PASS="${SRC_POSTGRES_PASSWORD}"
+SRC_SCHEMA="public"   # schema de origem (fixo)
+
+# --- Destino ---
+: "${POSTGRES_HOST:?Variável POSTGRES_HOST não definida}"
+: "${POSTGRES_DB:?Variável POSTGRES_DB não definida}"
+: "${POSTGRES_USER:?Variável POSTGRES_USER não definida}"
+: "${POSTGRES_PASSWORD:?Variável POSTGRES_PASSWORD não definida}"
+: "${POSTGRES_ADMIN_USER:?Variável POSTGRES_ADMIN_USER não definida}"
+: "${POSTGRES_ADMIN_PASSWORD:?Variável POSTGRES_ADMIN_PASSWORD não definida}"
+: "${POSTGRES_SCHEMA:?Variável POSTGRES_SCHEMA não definida}"
+
+DST_HOST="${POSTGRES_HOST}"
 DST_PORT="${POSTGRES_PORT:-5432}"
-DST_DB="${POSTGRES_DB:-homelab}"
-DST_ADMIN_USER="${POSTGRES_ADMIN_USER:-postgres}"
+DST_DB="${POSTGRES_DB}"
+DST_ADMIN_USER="${POSTGRES_ADMIN_USER}"
 DST_ADMIN_PASS="${POSTGRES_ADMIN_PASSWORD}"
-DST_APP_USER="${POSTGRES_USER:-lg.admin}"
-DST_APP_PASS="${POSTGRES_PASSWORD:-1234@Bizzi}"
-DST_SCHEMA="${POSTGRES_SCHEMA:-AlbumCopa2026}"
+DST_APP_USER="${POSTGRES_USER}"
+DST_APP_PASS="${POSTGRES_PASSWORD}"
+DST_SCHEMA="${POSTGRES_SCHEMA}"
 
 DUMP_FILE="/tmp/informapromo_data_$(date +%Y%m%d_%H%M%S).sql"
 
