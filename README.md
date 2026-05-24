@@ -16,6 +16,8 @@ Cada usuário tem seu próprio álbum independente com as **994 figurinhas** ofi
 | `/progresso` | Exibe estatísticas detalhadas: percentual, países completos, top-3 próximos e distantes, brilhantes faltantes e CC faltantes |
 | `/faltantes` | Lista figurinhas faltantes agrupadas por grupo de álbum (uma mensagem por grupo) |
 | `/repetidas` | Lista figurinhas repetidas agrupadas por grupo de álbum (uma mensagem por grupo) |
+| `/buscar` | Consulta o status de uma figurinha específica pelo código (fluxo conversacional) |
+| `/buscar_pais` | Exibe o detalhamento completo de uma seleção: figurinhas que tem, repetidas (excedente para troca) e faltantes |
 | `/cancelar` | Cancela a operação em andamento |
 
 ### Formatos aceitos para códigos
