@@ -11,6 +11,7 @@ import pytest
 from unittest.mock import MagicMock, call
 
 from exceptions.domain_exceptions import (
+    CodigoInvalidoError,
     FigurinhaNaoEncontradaError,
     QuantidadeInsuficienteError,
 )
@@ -310,3 +311,281 @@ class TestFigurinhaServiceRemover:
                 telegram_user_id=user_info["telegram_user_id"],
                 telegram_username=user_info["telegram_username"],
             )
+
+
+# ---------------------------------------------------------------------------
+# FigurinhaService.remover_lote
+# ---------------------------------------------------------------------------
+
+
+class TestFigurinhaServiceRemoverLote:
+    """Tests for ``FigurinhaService.remover_lote``."""
+
+    def test_remover_lote_quando_todas_entradas_validas_com_saldo_deve_retornar_todas_no_sucesso(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """All valid entries with enough stock must end up in sucesso; falhas must be empty."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        fig_bra = MagicMock(name="Figurinha_BRA1")
+        fig_arg = MagicMock(name="Figurinha_ARG1")
+        service.remover = MagicMock(side_effect=[fig_bra, fig_arg])
+
+        sucesso, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert sucesso == [fig_bra, fig_arg]
+
+    def test_remover_lote_quando_todas_entradas_validas_com_saldo_deve_retornar_falhas_vazio(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """All valid entries with enough stock must produce an empty falhas list."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock(side_effect=[MagicMock(), MagicMock()])
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas == []
+
+    def test_remover_lote_quando_codigo_invalido_deve_colocar_entrada_em_falhas(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """An entry that raises CodigoInvalidoError must appear in falhas."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        exc = CodigoInvalidoError("INVALIDO")
+        fig_ok = MagicMock(name="Figurinha_BRA1")
+        service.remover = MagicMock(side_effect=[exc, fig_ok])
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=["INVALIDO", "BRA-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas[0][0] == "INVALIDO"
+
+    def test_remover_lote_quando_codigo_invalido_deve_manter_entradas_validas_no_sucesso(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """Entries after a CodigoInvalidoError must still land in sucesso."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        exc = CodigoInvalidoError("INVALIDO")
+        fig_ok = MagicMock(name="Figurinha_BRA1")
+        service.remover = MagicMock(side_effect=[exc, fig_ok])
+
+        sucesso, _ = service.remover_lote(
+            entradas_brutas=["INVALIDO", "BRA-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert sucesso == [fig_ok]
+
+    def test_remover_lote_quando_saldo_insuficiente_deve_colocar_entrada_em_falhas(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """An entry with zero stock must appear in falhas as a QuantidadeInsuficienteError."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        exc = QuantidadeInsuficienteError("BRA-1", saldo_atual=0, quantidade_solicitada=1)
+        fig_ok = MagicMock(name="Figurinha_ARG1")
+        service.remover = MagicMock(side_effect=[exc, fig_ok])
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas[0] == ("BRA-1", str(exc))
+
+    def test_remover_lote_quando_saldo_insuficiente_deve_manter_entradas_validas_no_sucesso(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """Entries after a QuantidadeInsuficienteError must still land in sucesso."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        exc = QuantidadeInsuficienteError("BRA-1", saldo_atual=0, quantidade_solicitada=1)
+        fig_ok = MagicMock(name="Figurinha_ARG1")
+        service.remover = MagicMock(side_effect=[exc, fig_ok])
+
+        sucesso, _ = service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert sucesso == [fig_ok]
+
+    def test_remover_lote_quando_linha_em_branco_deve_ignorar_e_nao_colocar_em_sucesso(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """A blank line must be skipped — it must not appear in sucesso."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        fig_ok = MagicMock(name="Figurinha_BRA1")
+        service.remover = MagicMock(return_value=fig_ok)
+
+        sucesso, _ = service.remover_lote(
+            entradas_brutas=["BRA-1", "   ", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert len(sucesso) == 2
+
+    def test_remover_lote_quando_linha_em_branco_deve_ignorar_e_nao_colocar_em_falhas(
+        self,
+        mock_figurinha_repository: MagicMock,
+        sample_figurinha,
+        user_info: dict,
+    ):
+        """A blank line must be skipped — it must not appear in falhas."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock(return_value=MagicMock())
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1", "   "],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas == []
+
+    def test_remover_lote_quando_lote_vazio_deve_retornar_sucesso_vazio(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """An empty batch must return an empty sucesso list."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock()
+
+        sucesso, _ = service.remover_lote(
+            entradas_brutas=[],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert sucesso == []
+
+    def test_remover_lote_quando_lote_vazio_deve_retornar_falhas_vazio(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """An empty batch must return an empty falhas list."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock()
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=[],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas == []
+
+    def test_remover_lote_deve_chamar_remover_com_quantidade_um_para_cada_entrada(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """``remover_lote`` must call ``remover`` with ``quantidade=1`` for every entry."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock(return_value=MagicMock())
+
+        service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1", "FRA-3"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert service.remover.call_count == 3
+        assert all(c.kwargs["quantidade"] == 1 for c in service.remover.call_args_list)
+
+    def test_remover_lote_quando_figurinha_nao_encontrada_deve_colocar_entrada_em_falhas(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """An entry that raises FigurinhaNaoEncontradaError must appear in falhas."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        exc = FigurinhaNaoEncontradaError("BRA-1")
+        fig_ok = MagicMock(name="Figurinha_ARG1")
+        service.remover = MagicMock(side_effect=[exc, fig_ok])
+
+        sucesso, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1", "ARG-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas[0][0] == "BRA-1"
+        assert sucesso == [fig_ok]
+
+    def test_remover_lote_quando_erro_inesperado_deve_colocar_entrada_em_falhas_com_mensagem(
+        self,
+        mock_figurinha_repository: MagicMock,
+        user_info: dict,
+    ):
+        """An entry that raises a generic Exception must appear in falhas as (entrada, 'Erro inesperado')."""
+        mock_movimentacao_service = MagicMock(name="MovimentacaoService")
+        service, _ = _make_service(mock_figurinha_repository, mock_movimentacao_service)
+
+        service.remover = MagicMock(side_effect=Exception("boom"))
+
+        _, falhas = service.remover_lote(
+            entradas_brutas=["BRA-1"],
+            telegram_user_id=user_info["telegram_user_id"],
+            telegram_username=user_info["telegram_username"],
+        )
+
+        assert falhas[0] == ("BRA-1", "Erro inesperado")

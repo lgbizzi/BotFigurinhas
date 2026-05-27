@@ -8,6 +8,8 @@
 
 ## Status Geral
 
+✅ **Etapa 13 concluída** — 2026-05-26. Comando `/remover_lote` implementado com fluxo conversacional, templates, controller, handler e registro no bot (espelho de `/adicionar_lote`).
+
 ✅ **Etapa 11 concluída** — 2026-05-24. Comandos `/buscar` e `/buscar_pais` implementados com fluxo conversacional, templates e registro no bot.
 
 ✅ **Etapa 10 concluída** — 2026-05-23/24. Deploy em container Docker (PostgreSQL + bot), credenciais via `.env`, script de inicialização sem valores chumbados, documentação de deploy, scripts SQL de migração de dados.
@@ -255,6 +257,20 @@
 
 ---
 
+### Etapa 13 — Novo Comando: `/remover_lote`
+> Agentes: **Tests Analyst** → **Backend Dev** → **Bot Interface Dev** | Revisão: **QA** | Data: 2026-05-26
+
+| # | Tarefa | Status | Observações |
+|---|---|---|---|
+| 13.1 | Tests Analyst adiciona `TestFigurinhaServiceRemoverLote` a `tests/unit/test_figurinha_service.py` — 13 testes unitários cobrindo: lote válido, `CodigoInvalidoError`, `FigurinhaNaoEncontradaError`, `QuantidadeInsuficienteError`, linha em branco, lote vazio, `except Exception`, quantidade=1 por chamada | ✅ Concluído | Aprovado Rodada 33 (reprovado Rodada 32: B1 `for` em assert; B2/B3 caminhos sem cobertura; B4 fixture não usada) |
+| 13.2 | Backend Dev adiciona `remover_lote()` a `services/figurinha_service.py` — espelha `adicionar_lote`; captura `QuantidadeInsuficienteError` adicionalmente; 20 linhas executáveis | ✅ Concluído | Aprovado Rodada 32 |
+| 13.3 | Bot Interface Dev adiciona `solicitar_lote_remover()` e `formatar_resultado_remover_lote()` a `views/message_templates.py`; atualiza `boas_vindas()` com `/remover_lote` | ✅ Concluído | Aprovado Rodada 34 |
+| 13.4 | Bot Interface Dev adiciona `processar_remover_lote()` a `controllers/bot_controller.py` | ✅ Concluído | Aprovado Rodada 34 |
+| 13.5 | Bot Interface Dev adiciona `build_remover_lote_handler()` a `bot/handlers/lote_handler.py` | ✅ Concluído | Aprovado Rodada 34 |
+| 13.6 | Bot Interface Dev atualiza `bot/bot_setup.py` — importa e registra `build_remover_lote_handler` | ✅ Concluído | Aprovado Rodada 34 |
+
+---
+
 ## Legenda de Status
 
 | Ícone | Significado |
@@ -298,6 +314,7 @@
 | 2026-05-24 | `/excluir_usuario` usa `ReplyKeyboardMarkup` com botões Sim/Não | Reduz chance de erro de digitação em operação irreversível; teclado é removido após a resposta via `ReplyKeyboardRemove` | Business Analyst |
 | 2026-05-24 | DELETE em ordem FK-safe: `movimentacoes` antes de `figurinhas` | `movimentacoes.figurinha_id` tem `ON DELETE RESTRICT`; inverter a ordem causaria erro de FK | Business Analyst |
 | 2026-05-24 | Criar `docs/PRIVACY_POLICY.md` com política de privacidade mínima | Documentar os dados coletados (Telegram ID e username) e direitos do usuário (consulta e exclusão), em conformidade com boas práticas de privacidade | Business Analyst (solicitação do usuário) |
+| 2026-05-26 | `/remover_lote` implementado como `ConversationHandler` de 1 passo em `lote_handler.py`, espelhando `/adicionar_lote`; `remover_lote()` no service captura `QuantidadeInsuficienteError` adicionalmente (diferença necessária pois remoção pode falhar por saldo insuficiente) | Consistência com o padrão de batch já existente; isolamento de estado de espera de entrada | Business Analyst (solicitação do usuário) |
 
 ---
 

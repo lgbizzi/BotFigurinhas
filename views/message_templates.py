@@ -420,6 +420,7 @@ def boas_vindas() -> str:
         "• /adicionar — Adicionar figurinha ao estoque\n"
         "• /adicionar\\_lote — Adicionar várias figurinhas de uma vez\n"
         "• /remover — Remover figurinha do estoque\n"
+        "• /remover\\_lote — Remover várias figurinhas de uma vez\n"
         "• /progresso — Ver % de completude do álbum\n"
         "• /faltantes — Ver figurinhas que faltam por país\n"
         "• /repetidas — Ver figurinhas repetidas\n"
@@ -466,6 +467,54 @@ def formatar_resultado_lote(
     linhas: list[str] = []
     if sucesso:
         linhas.append(f"✅ *Adicionadas com sucesso ({len(sucesso)}):*")
+        for fig in sucesso:
+            linhas.append(
+                f"• {fig.codigo_figurinha} ({fig.nome_selecao}) → saldo: *{fig.quantidade}*"
+            )
+    if falhas:
+        if linhas:
+            linhas.append("")
+        linhas.append(f"❌ *Não processadas ({len(falhas)}):*")
+        for entrada, motivo in falhas:
+            linhas.append(f"• `{entrada}` — {motivo}")
+    return "\n".join(linhas)
+
+
+def solicitar_lote_remover() -> str:
+    """Prompt the user to send a list of sticker codes to remove, one per line.
+
+    Returns:
+        Instruction message for the batch-remove flow.
+    """
+    return (
+        "ℹ️ Envie os códigos das figurinhas, *um por linha*.\n"
+        "Cada figurinha terá -1 unidade.\n\n"
+        "Exemplo:\n"
+        "`BRA-1`\n"
+        "`Argentina 5`\n"
+        "`GER-3`\n\n"
+        "Envie /cancelar para cancelar."
+    )
+
+
+def formatar_resultado_remover_lote(
+    sucesso: list,
+    falhas: list[tuple[str, str]],
+) -> str:
+    """Format the result of a batch-remove operation.
+
+    Args:
+        sucesso: List of :class:`~models.figurinha.Figurinha` objects that
+            were successfully updated.
+        falhas: List of ``(entrada_bruta, error_message)`` pairs for entries
+            that could not be processed.
+
+    Returns:
+        Multi-line Markdown summary of the batch result.
+    """
+    linhas: list[str] = []
+    if sucesso:
+        linhas.append(f"✅ *Removidas com sucesso ({len(sucesso)}):*")
         for fig in sucesso:
             linhas.append(
                 f"• {fig.codigo_figurinha} ({fig.nome_selecao}) → saldo: *{fig.quantidade}*"

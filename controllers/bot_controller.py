@@ -242,6 +242,38 @@ class BotController:
             logger.exception("processar_adicionar_lote: unexpected error")
             return tmpl.erro_generico()
 
+    async def processar_remover_lote(
+        self,
+        entradas_brutas: list[str],
+        telegram_user_id: int,
+        telegram_username: str,
+    ) -> str:
+        """Process a batch of sticker codes, removing 1 of each.
+
+        Delegates to :meth:`~services.figurinha_service.FigurinhaService.remover_lote`.
+        Each entry is processed independently — partial success is reported.
+        Never raises; always returns a formatted result string.
+
+        Args:
+            entradas_brutas: Raw sticker codes split from the user's message.
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram ``@username`` of the user.
+
+        Returns:
+            Formatted batch result message ready to send.
+        """
+        try:
+            self._garantir_album(telegram_user_id, telegram_username)
+            sucesso, falhas = self._service.remover_lote(
+                entradas_brutas=entradas_brutas,
+                telegram_user_id=telegram_user_id,
+                telegram_username=telegram_username,
+            )
+            return tmpl.formatar_resultado_remover_lote(sucesso, falhas)
+        except Exception:
+            logger.exception("processar_remover_lote: unexpected error")
+            return tmpl.erro_generico()
+
     def consultar_dados_usuario(self, telegram_user_id: int, telegram_username: str) -> str:
         """Return a formatted message with data stored for the user.
 

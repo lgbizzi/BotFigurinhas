@@ -310,6 +310,50 @@ class FigurinhaService:
                 falhas.append((entrada, "Erro inesperado"))
         return sucesso, falhas
 
+    def remover_lote(
+        self,
+        entradas_brutas: list[str],
+        telegram_user_id: int,
+        telegram_username: str,
+    ) -> tuple[list[Figurinha], list[tuple[str, str]]]:
+        """Remove 1 of each sticker in a batch, processing each line independently.
+
+        Iterates over *entradas_brutas*, skips blank lines, and calls
+        :meth:`remover` with ``quantidade=1`` for each entry.  Failures for
+        individual entries are collected and returned rather than aborting the
+        whole batch.
+
+        Args:
+            entradas_brutas: List of raw sticker codes (one per original line).
+            telegram_user_id: Numeric Telegram user ID.
+            telegram_username: Telegram ``@username`` of the user.
+
+        Returns:
+            A tuple ``(sucesso, falhas)`` where *sucesso* is a list of updated
+            :class:`~models.figurinha.Figurinha` objects and *falhas* is a list
+            of ``(entrada_bruta, error_message)`` pairs.
+        """
+        sucesso: list[Figurinha] = []
+        falhas: list[tuple[str, str]] = []
+        for entrada in entradas_brutas:
+            entrada = entrada.strip()
+            if not entrada:
+                continue
+            try:
+                fig = self.remover(
+                    entrada_bruta=entrada,
+                    quantidade=1,
+                    telegram_user_id=telegram_user_id,
+                    telegram_username=telegram_username,
+                )
+                sucesso.append(fig)
+            except (CodigoInvalidoError, FigurinhaNaoEncontradaError, QuantidadeInsuficienteError, ValueError) as exc:
+                falhas.append((entrada, str(exc)))
+            except Exception:
+                logger.exception("remover_lote: erro inesperado para entrada=%r", entrada)
+                falhas.append((entrada, "Erro inesperado"))
+        return sucesso, falhas
+
     def consultar_dados_usuario(self, telegram_user_id: int) -> dict:
         """Return a summary of data stored for the given user.
 

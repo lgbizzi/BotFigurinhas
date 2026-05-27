@@ -15,7 +15,7 @@ from bot.handlers.adicionar_handler import build_adicionar_handler
 from bot.handlers.buscar_handler import build_buscar_handlers
 from bot.handlers.privacidade_handler import build_privacidade_handlers
 from bot.handlers.consultas_handler import build_consultas_handlers
-from bot.handlers.lote_handler import build_lote_handler
+from bot.handlers.lote_handler import build_lote_handler, build_remover_lote_handler
 from bot.handlers.remover_handler import build_remover_handler
 from controllers.bot_controller import BotController
 from views import message_templates as tmpl
@@ -69,6 +69,7 @@ def setup_bot(application: Application, bot_controller: BotController) -> None:
     application.add_handler(build_adicionar_handler(bot_controller))
     application.add_handler(build_remover_handler(bot_controller))
     application.add_handler(build_lote_handler(bot_controller))
+    application.add_handler(build_remover_lote_handler(bot_controller))
     for handler in build_consultas_handlers(bot_controller):
         application.add_handler(handler)
     for handler in build_buscar_handlers(bot_controller):
