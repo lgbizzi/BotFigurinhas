@@ -522,7 +522,7 @@ def formatar_resultado_remover_lote(
     if falhas:
         if linhas:
             linhas.append("")
-        linhas.append(f"❌ *Não processadas ({len(falhas)}):*")
+        linhas.append(f"❌ *Não processadas — saldo insuficiente ({len(falhas)}):*")
         for entrada, motivo in falhas:
             linhas.append(f"• `{entrada}` — {motivo}")
     return "\n".join(linhas)
